@@ -13,6 +13,11 @@ RUN go mod download
 # Copy the source code
 COPY . .
 
+# Compile TypeScript files and regenerate webUI.go
+RUN cd ts && npm install -g typescript && tsc -p tsconfig.json
+RUN go build threadfin.go && timeout 10s ./threadfin -dev || echo "webUI.go regenerated"
+RUN rm -f threadfin
+
 # Build the application with optimizations
 RUN CGO_ENABLED=0 go build -mod=mod -ldflags="-s -w" -trimpath -o threadfin threadfin.go
 
