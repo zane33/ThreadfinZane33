@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   threadfin:
-    image: threadfin:latest  # Replace with your actual image name/tag
+    image: threadfinzane33:latest  # Your custom ThreadfinZane33 fork
     container_name: threadfin
     restart: unless-stopped
     
