@@ -59,6 +59,7 @@ type RequestStruct struct {
 		Dummy                    *bool     `json:"dummy,omitempty"`
 		DummyChannel             *string   `json:"dummyChannel,omitempty"`
 		IgnoreFilters            *bool     `json:"ignoreFilters,omitempty"`
+		OneRequestPerTuner       *bool     `json:"oneRequestPerTuner,omitempty"`
 	} `json:"settings,omitempty"`
 
 	// Upload Logo
