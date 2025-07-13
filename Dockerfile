@@ -13,12 +13,7 @@ RUN go mod download
 # Copy the source code
 COPY . .
 
-# Install Node.js and TypeScript
-RUN apt-get update && apt-get install -y nodejs npm
-RUN npm install -g typescript
-
-# Compile TypeScript files and regenerate webUI.go
-RUN cd ts && tsc -p tsconfig.json
+# Regenerate webUI.go with updated JavaScript files
 RUN go build threadfin.go && timeout 10s ./threadfin -dev || echo "webUI.go regenerated"
 RUN rm -f threadfin
 
