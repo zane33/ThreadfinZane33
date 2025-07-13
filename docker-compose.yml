@@ -20,7 +20,7 @@ services:
       - THREADFIN_BIND_IP_ADDRESS=0.0.0.0
       - THREADFIN_DEBUG=0
       - THREADFIN_BRANCH=main
-      - TZ=America/New_York  # Set your timezone
+      - TZ=Pacific/Auckland # Set your timezone
     
     # Optional: if you want to run as specific user/group
     # user: "31337:31337"
