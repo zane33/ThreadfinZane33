@@ -17,9 +17,17 @@ COPY . .
 RUN echo "Removing existing webUI.go file if it exists..."
 RUN rm -f src/webUI.go
 
+# Create a minimal stub webUI.go file to allow initial build
+RUN echo "Creating stub webUI.go file..."
+RUN echo 'package src' > src/webUI.go && \
+    echo '' >> src/webUI.go && \
+    echo 'var webUI = make(map[string]interface{})' >> src/webUI.go && \
+    echo '' >> src/webUI.go && \
+    echo 'func loadHTMLMap() {}' >> src/webUI.go
+
 # Build a temporary binary to regenerate webUI.go
 RUN echo "Building temporary binary to regenerate webUI.go..."
-RUN go build -o threadfin-temp threadfin.go
+RUN go build -mod=mod -o threadfin-temp threadfin.go
 
 # Run in dev mode to regenerate webUI.go with updated JavaScript
 RUN echo "Running in dev mode to regenerate webUI.go..."
