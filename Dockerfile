@@ -13,11 +13,29 @@ RUN go mod download
 # Copy the source code
 COPY . .
 
-# Regenerate webUI.go with updated JavaScript files
-RUN go build threadfin.go && timeout 10s ./threadfin -dev || echo "webUI.go regenerated"
-RUN rm -f threadfin
+# Ensure webUI.go is regenerated with updated JavaScript files
+RUN echo "Removing existing webUI.go file if it exists..."
+RUN rm -f src/webUI.go
 
-# Build the application with optimizations
+# Build a temporary binary to regenerate webUI.go
+RUN echo "Building temporary binary to regenerate webUI.go..."
+RUN go build -o threadfin-temp threadfin.go
+
+# Run in dev mode to regenerate webUI.go with updated JavaScript
+RUN echo "Running in dev mode to regenerate webUI.go..."
+RUN ./threadfin-temp -dev &
+RUN sleep 15
+RUN pkill -f threadfin-temp || echo "Process already stopped"
+
+# Verify webUI.go was regenerated
+RUN echo "Verifying webUI.go was regenerated..."
+RUN ls -la src/webUI.go && echo "webUI.go successfully regenerated" || (echo "ERROR: webUI.go not found!" && exit 1)
+
+# Clean up temporary binary
+RUN rm -f threadfin-temp
+
+# Build the final application with optimizations
+RUN echo "Building final optimized binary..."
 RUN CGO_ENABLED=0 go build -mod=mod -ldflags="-s -w" -trimpath -o threadfin threadfin.go
 
 # Second stage. Creating a minimal image
