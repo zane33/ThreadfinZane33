@@ -31,9 +31,7 @@ RUN go build -mod=mod -o threadfin-temp threadfin.go
 
 # Run in dev mode to regenerate webUI.go with updated JavaScript
 RUN echo "Running in dev mode to regenerate webUI.go..."
-RUN ./threadfin-temp -dev &
-RUN sleep 15
-RUN pkill -f threadfin-temp || echo "Process already stopped"
+RUN timeout 30 ./threadfin-temp -dev || echo "Dev mode completed"
 
 # Verify webUI.go was regenerated
 RUN echo "Verifying webUI.go was regenerated..."
