@@ -39,7 +39,7 @@ LABEL org.label-schema.build-date="${BUILD_DATE}" \
       org.label-schema.vcs-url="https://github.com/zane33/ThreadfinZane33" \
       org.label-schema.vendor="Threadfin" \
       org.label-schema.version="${THREADFIN_VERSION}" \
-      org.label-schema.schema-version="1.0" \
+      org.label-schema.schema-version="1.0"
 
 ENV THREADFIN_BIN=/home/threadfin/bin \
     THREADFIN_CONF=/home/threadfin/conf \
