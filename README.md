@@ -36,6 +36,10 @@ You can follow the old xTeVe documentation for now until I update it for Threadf
 * New Bootstrap based UI
 * RAM based buffer instead of File based
 
+#### Streaming
+* **1 Request per Tuner**: Option to ensure each stream request uses a separate tuner/backend process for complete isolation
+* Multiple client support with shared or dedicated tuner allocation
+
 #### Filter Group
 * Can now add a starting channel number for the filter group
 
@@ -67,6 +71,7 @@ You can follow the old xTeVe documentation for now until I update it for Threadf
 * Buffer with HLS / M3U8 support
 * Re-streaming
 * Number of tuners adjustable
+* Configurable tuner allocation (shared or dedicated per request)
 * Compatible with Plex / Emby / Jellyfin EPG
 
 ---

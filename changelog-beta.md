@@ -1,3 +1,10 @@
+#### 2.1.1.0117-beta
+```diff
++ Added "1 Request per Tuner" setting for dedicated tuner allocation per stream request
++ Each stream can now operate with its own independent backend process when enabled
++ Enhanced streaming isolation and resource management options
+```
+
 #### 2.1.1.0116-beta
 If no user agent is specified, the default FFmpeg or VLC user agent is used.
 
