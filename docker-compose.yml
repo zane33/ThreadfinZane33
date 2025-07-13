@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  threadfin:
+    image: threadfin:latest  # Replace with your actual image name/tag
+    container_name: threadfin
+    restart: unless-stopped
+    
+    ports:
+      - "34400:34400"
+    
+    volumes:
+      - threadfin_conf:/home/threadfin/conf
+      - threadfin_temp:/tmp/threadfin
+      - threadfin_cache:/home/threadfin/cache
+      - threadfin_logs:/var/log
+    
+    environment:
+      - THREADFIN_PORT=34400
+      - THREADFIN_BIND_IP_ADDRESS=0.0.0.0
+      - THREADFIN_DEBUG=0
+      - THREADFIN_BRANCH=main
+      - TZ=America/New_York  # Set your timezone
+    
+    # Optional: if you want to run as specific user/group
+    # user: "31337:31337"
+    
+    # Optional: add labels for better organization in Portainer
+    labels:
+      - "traefik.enable=false"  # Disable if using Traefik
+      - "com.centurylinklabs.watchtower.enable=true"  # Enable Watchtower updates
+    
+    # Optional: resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+volumes:
+  threadfin_conf:
+    driver: local
+  threadfin_temp:
+    driver: local
+  threadfin_cache:
+    driver: local
+  threadfin_logs:
+    driver: local 
