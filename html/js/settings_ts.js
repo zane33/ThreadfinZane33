@@ -382,6 +382,17 @@ class SettingsCategory {
                 setting.appendChild(tdLeft);
                 setting.appendChild(tdRight);
                 break;
+            case "oneRequestPerTuner":
+                var tdLeft = document.createElement("TD");
+                tdLeft.innerHTML = "{{.settings.oneRequestPerTuner.title}}" + ":";
+                var tdRight = document.createElement("TD");
+                var input = content.createCheckbox(settingsKey);
+                input.checked = data;
+                input.setAttribute("onchange", "javascript: this.className = 'changed'");
+                tdRight.appendChild(input);
+                setting.appendChild(tdLeft);
+                setting.appendChild(tdRight);
+                break;
             case "api":
                 var tdLeft = document.createElement("TD");
                 tdLeft.innerHTML = "{{.settings.api.title}}" + ":";
@@ -588,6 +599,9 @@ class SettingsCategory {
                 break;
             case "udpxy":
                 text = "{{.settings.udpxy.description}}";
+                break;
+            case "oneRequestPerTuner":
+                text = "{{.settings.oneRequestPerTuner.description}}";
                 break;
             default:
                 text = "";

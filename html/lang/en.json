@@ -422,6 +422,10 @@
       "title": "Number of Tuners",
       "description": "Number of parallel connections that can be established to the provider.<br>Available for: Plex, Emby, Jellyfin, M3U (with active buffer).<br>After a change, Threadfin must be delete in the Plex / Emby / Jellyfin DVR settings and set up again."
     },
+    "oneRequestPerTuner": {
+      "title": "1 Request per Tuner",
+      "description": "When enabled, every stream request uses a separate tuner, up to the tuner limit. This ensures each stream operates independently with its own backend process. When disabled, multiple clients can share the same stream/tuner."
+    },
     "filesUpdate": {
       "title": "Updates all files at startup",
       "description": "Updates all playlists, tuner and XMLTV files at startup."

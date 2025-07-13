@@ -343,6 +343,7 @@ type SettingsStruct struct {
 	Dummy                     bool                  `json:"dummy"`
 	DummyChannel              string                `json:"dummyChannel"`
 	IgnoreFilters             bool                  `json:"ignoreFilters"`
+	OneRequestPerTuner        bool                  `json:"oneRequestPerTuner"`
 }
 
 // LanguageUI : Sprache für das WebUI

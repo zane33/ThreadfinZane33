@@ -234,47 +234,50 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 
 		// Playlist is already used for streaming
 		// Check if the URL is already streaming from another client.
-		for id := range playlist.Streams {
+		// If oneRequestPerTuner is enabled, skip sharing streams with existing clients
+		if !Settings.OneRequestPerTuner {
+			for id := range playlist.Streams {
 
-			stream = playlist.Streams[id]
-			client = playlist.Clients[id]
+				stream = playlist.Streams[id]
+				client = playlist.Clients[id]
 
-			stream.BackupChannel1 = backupStream1
-			stream.BackupChannel2 = backupStream2
-			stream.BackupChannel3 = backupStream3
-			stream.ChannelName = channelName
-			stream.Status = false
+				stream.BackupChannel1 = backupStream1
+				stream.BackupChannel2 = backupStream2
+				stream.BackupChannel3 = backupStream3
+				stream.ChannelName = channelName
+				stream.Status = false
 
-			if streamingURL == stream.URL {
+				if streamingURL == stream.URL {
 
-				streamID = id
-				newStream = false
-				client.Connection += 1
+					streamID = id
+					newStream = false
+					client.Connection += 1
 
-				playlist.Clients[streamID] = client
+					playlist.Clients[streamID] = client
 
-				Lock.Lock()
-				BufferInformation.Store(playlistID, playlist)
-				Lock.Unlock()
+					Lock.Lock()
+					BufferInformation.Store(playlistID, playlist)
+					Lock.Unlock()
 
-				debug = fmt.Sprintf("Restream Status:Playlist: %s - Channel: %s - Connections: %d", playlist.PlaylistName, stream.ChannelName, client.Connection)
+					debug = fmt.Sprintf("Restream Status:Playlist: %s - Channel: %s - Connections: %d", playlist.PlaylistName, stream.ChannelName, client.Connection)
 
-				showDebug(debug, 1)
+					showDebug(debug, 1)
 
-				if c, ok := BufferClients.Load(playlistID + stream.MD5); ok {
+					if c, ok := BufferClients.Load(playlistID + stream.MD5); ok {
 
-					var clients = c.(ClientConnection)
-					clients.Connection = client.Connection
+						var clients = c.(ClientConnection)
+						clients.Connection = client.Connection
 
-					showInfo(fmt.Sprintf("Streaming Status:Channel: %s (Clients: %d)", stream.ChannelName, clients.Connection))
+						showInfo(fmt.Sprintf("Streaming Status:Channel: %s (Clients: %d)", stream.ChannelName, clients.Connection))
 
-					BufferClients.Store(playlistID+stream.MD5, clients)
+						BufferClients.Store(playlistID+stream.MD5, clients)
 
+					}
+
+					break
 				}
 
-				break
 			}
-
 		}
 
 		// New stream for an already active playlist
