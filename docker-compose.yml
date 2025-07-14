@@ -6,9 +6,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    
     # Option 2: Use pre-built image (uncomment if you have a built image)
     # image: threadfinzane33:latest
+    networks:
+      - bridge
     
     container_name: threadfin
     restart: unless-stopped
