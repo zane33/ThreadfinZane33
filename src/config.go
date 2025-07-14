@@ -163,7 +163,7 @@ func Init() (err error) {
 	// Einstellungen laden (settings.json)
 	showInfo(fmt.Sprintf("Load Settings:%s", System.File.Settings))
 
-	_, err = loadSettings()
+	Settings, err = loadSettings()
 	if err != nil {
 		ShowError(err, 0)
 		return

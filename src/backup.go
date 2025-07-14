@@ -176,9 +176,13 @@ func ThreadfinRestore(archive string) (newWebURL string, err error) {
 			ShowError(err, 0)
 		}
 
-		loadSettings()
+		Settings, err = loadSettings()
+		if err != nil {
+			ShowError(err, 0)
+			return "", err
+		}
 
-		err := Init()
+		err = Init()
 		if err != nil {
 			ShowError(err, 0)
 			return "", err
