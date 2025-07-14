@@ -83,6 +83,12 @@ func BinaryUpdate() (err error) {
 			}
 		}
 
+		// Check if we found a valid release
+		if latest == "" || updater.Response.Version == "" {
+			showInfo(fmt.Sprintf("No valid %s release found on GitHub", System.Branch))
+			return nil
+		}
+
 		var File = fmt.Sprintf("%s/releases/download/%s/%s_%s_%s", System.Update.Git, latest, "Threadfin", System.OS, System.ARCH)
 
 		updater.Response.Status = true
@@ -124,8 +130,18 @@ func BinaryUpdate() (err error) {
 	}
 
 	var currentVersion = System.Version + "." + System.Build
-	current_version, _ := version.NewVersion(currentVersion)
-	response_version, _ := version.NewVersion(updater.Response.Version)
+	current_version, err := version.NewVersion(currentVersion)
+	if err != nil {
+		showInfo(fmt.Sprintf("Invalid current version format: %s", currentVersion))
+		return nil
+	}
+	
+	response_version, err := version.NewVersion(updater.Response.Version)
+	if err != nil {
+		showInfo(fmt.Sprintf("Invalid response version format: %s", updater.Response.Version))
+		return nil
+	}
+	
 	// Versionsnummer überprüfen
 	if response_version.GreaterThan(current_version) && updater.Response.Status {
 		if Settings.ThreadfinAutoUpdate {
