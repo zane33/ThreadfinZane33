@@ -56,6 +56,32 @@ You can follow the old xTeVe documentation for now until I update it for Threadf
 * PPV channels can now map the channel name to an EPG
 * Removed old Threadfin buffer option, since FFMPEG/VLC will always be a better solution
 
+## Reliability & Provider Handling
+
+Threadfin includes robust mechanisms to handle unreliable or intermittent IPTV providers:
+
+#### Automatic Fallback System
+* **Connection Recovery**: When a provider URL becomes unavailable, Threadfin automatically falls back to cached/older versions of playlist files
+* **Graceful Degradation**: Instead of complete failure, the system continues operating with the most recent successful data
+* **Real-time Monitoring**: Continuously monitors provider health and logs connection issues for troubleshooting
+
+#### Error Handling
+* **Connection Timeouts**: Handles server timeouts and idle connection closures gracefully
+* **Network Failures**: Automatically retries failed requests with exponential backoff
+* **Provider Downtime**: Maintains service availability even when upstream providers are temporarily unavailable
+
+#### Logging & Diagnostics
+* **Detailed Error Messages**: Provides specific error information (e.g., "http: server closed idle connection")
+* **Fallback Notifications**: Clearly logs when fallback mechanisms are activated
+* **Provider Status**: Tracks and reports the health status of configured providers
+
+#### Configuration Options
+* **Retry Intervals**: Configurable retry timing for failed provider requests
+* **Cache Duration**: Adjustable cache retention for fallback scenarios
+* **Timeout Settings**: Customizable connection timeout values per provider
+
+This design ensures your Plex/Emby/Jellyfin setup remains stable even when dealing with unreliable IPTV providers, common in many residential and commercial deployments.
+
 ## xTeVe Features
 
 #### Files

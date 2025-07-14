@@ -28,6 +28,12 @@ services:
       - THREADFIN_BRANCH=main
       - TZ=Pacific/Auckland # Set your timezone
     
+    # DNS configuration to resolve external hostnames
+    dns:
+      - 8.8.8.8          # Google DNS
+      - 1.1.1.1          # Cloudflare DNS
+      - 208.67.222.222   # OpenDNS
+    
     # Optional: if you want to run as specific user/group
     # user: "31337:31337"
     
