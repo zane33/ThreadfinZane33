@@ -150,6 +150,7 @@ func main() {
 
 	if bindIpAddress != nil && len(*bindIpAddress) > 0 {
 		system.IPAddress = *bindIpAddress
+		system.Flag.BindIP = *bindIpAddress
 	}
 
 	// Branch

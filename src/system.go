@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"reflect"
 	"strings"
@@ -154,6 +153,11 @@ func loadSettings() (settings SettingsStruct, err error) {
 	defaults["httpsPort"] = 443
 	defaults["httpsThreadfinDomain"] = ""
 	defaults["httpThreadfinDomain"] = ""
+	if isRunningInContainer() {
+		defaults["bindIpAddress"] = "0.0.0.0"
+	} else {
+		defaults["bindIpAddress"] = ""
+	}
 	defaults["enableNonAscii"] = false
 	defaults["epgCategories"] = "Kids:kids|News:news|Movie:movie|Series:series|Sports:sports"
 	defaults["epgCategoriesColors"] = "kids:mediumpurple|news:tomato|movie:royalblue|series:gold|sports:yellowgreen"
@@ -184,6 +188,11 @@ func loadSettings() (settings SettingsStruct, err error) {
 	// Einstellungen von den Flags übernehmen
 	if len(System.Flag.Port) > 0 {
 		settings.Port = System.Flag.Port
+	}
+
+	if len(System.Flag.BindIP) > 0 {
+		settings.BindIpAddress = System.Flag.BindIP
+		showInfo(fmt.Sprintf("Bind IP Address:Using bind IP -> %s", settings.BindIpAddress))
 	}
 
 	if len(System.Flag.Branch) > 0 {
@@ -281,7 +290,6 @@ func setGlobalDomain(domain string) {
 	}
 
 	if Settings.EpgSource != "XEPG" {
-		log.Println("SOURCE: ", Settings.EpgSource)
 		System.Addresses.M3U = getErrMsg(2106)
 		System.Addresses.XML = getErrMsg(2106)
 	}

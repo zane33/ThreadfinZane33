@@ -56,6 +56,7 @@ type SystemStruct struct {
 		Port    string
 		Restore string
 		SSDP    bool
+		BindIP  string
 	}
 
 	Folder struct {
