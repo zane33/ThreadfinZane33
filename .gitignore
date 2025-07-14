@@ -4,3 +4,4 @@ vendor/
 .DS_Store
 threadfin.exe
 .idea/**
+/node_modules
