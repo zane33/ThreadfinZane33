@@ -575,3 +575,45 @@ function updateLog() {
     var server = new Server("updateLog");
     server.request(new Object());
 }
+
+function showNotification(message, type, duration) {
+    // Remove existing notifications
+    var existingNotification = document.querySelector('.error-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+
+    // Create notification element
+    var notification = document.createElement('div');
+    notification.className = 'error-notification';
+    
+    // Add type class (error, warning, info, success)
+    if (type) {
+        notification.classList.add(type);
+    }
+
+    // Add close button
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'close-btn';
+    closeBtn.innerHTML = '×';
+    closeBtn.onclick = function() {
+        notification.remove();
+    };
+
+    // Add message
+    var messageText = document.createElement('div');
+    messageText.innerHTML = message;
+
+    notification.appendChild(closeBtn);
+    notification.appendChild(messageText);
+    
+    // Add to document
+    document.body.appendChild(notification);
+
+    // Auto-remove after duration (default 8 seconds)
+    setTimeout(function() {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, duration || 8000);
+}
