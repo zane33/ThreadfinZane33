@@ -4,7 +4,7 @@ var COLUMN_TO_SORT;
 var INACTIVE_COLUMN_TO_SORT;
 var SEARCH_MAPPING = new Object();
 var UNDO = new Object();
-var SERVER_CONNECTION = false;
+// SERVER_CONNECTION removed - now supports multiple concurrent requests
 var WS_AVAILABLE = false;
 const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
 const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));

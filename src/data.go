@@ -366,6 +366,8 @@ func saveFiles(request RequestStruct, fileType string) (err error) {
 // Providerdaten manuell aktualisieren (WebUI)
 func updateFile(request RequestStruct, fileType string) (err error) {
 
+	showInfo("Update:" + "Beginning update process for " + fileType)
+
 	var updateData = make(map[string]interface{})
 
 	switch fileType {
@@ -380,16 +382,29 @@ func updateFile(request RequestStruct, fileType string) (err error) {
 		updateData = request.Files.XMLTV
 	}
 
+	showInfo("Update:" + "Found " + fmt.Sprintf("%d", len(updateData)) + " items to update")
+
 	for dataID := range updateData {
 
+		showInfo("Update:" + "Processing dataID " + dataID)
 		err = getProviderData(fileType, dataID)
 		if err == nil {
+			showInfo("Update:" + "getProviderData completed for " + dataID)
 			err = buildDatabaseDVR()
-			buildXEPG(false)
+			if err == nil {
+				showInfo("Update:" + "buildDatabaseDVR completed for " + dataID)
+				buildXEPG(false)
+				showInfo("Update:" + "buildXEPG completed for " + dataID)
+			} else {
+				showInfo("Update:" + "buildDatabaseDVR failed for " + dataID + " - " + err.Error())
+			}
+		} else {
+			showInfo("Update:" + "getProviderData failed for " + dataID + " - " + err.Error())
 		}
 
 	}
 
+	showInfo("Update:" + "Update process finished for " + fileType)
 	return
 }
 

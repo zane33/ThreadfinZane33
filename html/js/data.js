@@ -250,7 +250,7 @@ function Threadfin(data) {
 
     if (response.hasOwnProperty("status")) {
       if (response["status"] == false) {
-        alert(response["err"])
+        showNotification(response["err"], "error", 10000);
         if (response.hasOwnProperty("reload")) {
           location.reload();
         }

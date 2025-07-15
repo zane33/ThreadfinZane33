@@ -2001,12 +2001,17 @@ function changeChannelLogo(epgMapId) {
     }
 }
 function savePopupData(dataType, id, remove, option) {
+    console.log("DEBUG: savePopupData called with:", dataType, id, remove, option);
     showElement("loading", true);
     if (dataType == "mapping") {
         var data = new Object();
         console.log("Save mapping data");
         cmd = "saveEpgMapping";
         data["epgMapping"] = SERVER["xepg"]["epgMapping"];
+        
+        // Show loading notification for EPG mapping save
+        showNotification("Saving EPG mapping... Please wait", "info", 10000);
+        
         console.log("SEND TO SERVER");
         var server = new Server(cmd);
         server.request(data);
@@ -2014,7 +2019,7 @@ function savePopupData(dataType, id, remove, option) {
         showElement("loading", false);
         return;
     }
-    console.log("Save popup data");
+    console.log("DEBUG: Save popup data for:", dataType, id, remove, option);
     var div = document.getElementById("popup-custom");
     var inputs = div.getElementsByTagName("TABLE")[0].getElementsByTagName("INPUT");
     var selects = div.getElementsByTagName("TABLE")[0].getElementsByTagName("SELECT");
@@ -2138,11 +2143,30 @@ function savePopupData(dataType, id, remove, option) {
             return;
         }
     }
-    console.log("SEND TO SERVER");
-    console.log(data);
+    console.log("DEBUG: About to send to server");
+    console.log("DEBUG: Command:", cmd);
+    console.log("DEBUG: Data:", data);
+    
+    // Show loading status with specific messages for different operations
+    if (cmd === "saveFilesM3U" || cmd === "updateFileM3U") {
+        console.log("DEBUG: Showing M3U notification");
+        // showNotification("Downloading and validating playlist... Please wait", "info", 30000);
+    } else if (cmd === "saveFilesXMLTV" || cmd === "updateFileXMLTV") {
+        // showNotification("Saving XMLTV file... Please wait", "info", 10000);
+    } else if (cmd === "saveFilter") {
+        // showNotification("Saving filter... Please wait", "info", 10000);
+    } else if (cmd === "saveUserData" || cmd === "saveNewUser") {
+        // showNotification("Saving user... Please wait", "info", 10000);
+    } else if (cmd === "saveFilesHDHR" || cmd === "updateFileHDHR") {
+        // showNotification("Saving HDHomeRun tuner... Please wait", "info", 10000);
+    }
+    
+    console.log("DEBUG: Creating server object with cmd:", cmd);
     var server = new Server(cmd);
+    console.log("DEBUG: Calling server.request()");
     server.request(data);
-    showElement("loading", false);
+    console.log("DEBUG: server.request() call completed");
+    // Don't dismiss loading here - let the response handler do it
 }
 function donePopupData(dataType, idsStr) {
     var ids = idsStr.split(',');

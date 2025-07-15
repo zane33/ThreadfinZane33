@@ -238,6 +238,7 @@ function Threadfin(data) {
       if (response["status"] == false) {
         document.getElementById("headline").style.borderColor = "red";
         showErr(response["err"]);
+        showNotification(response["err"], "error", 10000);
         showLoadingScreen(false)
         return
       } else {

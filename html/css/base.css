@@ -42,6 +42,67 @@ a {
   color: #00E6FF;
 }
 
+/* Error notification styles */
+.error-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #ff4444;
+  color: white;
+  padding: 15px 20px;
+  border-radius: 5px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+  max-width: 400px;
+  font-size: 14px;
+  line-height: 1.4;
+  animation: slideIn 0.3s ease;
+}
+
+.error-notification.warning {
+  background: #ff9500;
+}
+
+.error-notification.info {
+  background: #0099ff;
+}
+
+.error-notification.success {
+  background: #00cc44;
+}
+
+.error-notification .close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+  float: right;
+  cursor: pointer;
+  margin-left: 10px;
+  line-height: 1;
+}
+
+.error-notification .close-btn:hover {
+  opacity: 0.7;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.loading-status {
+  color: #00E6FF;
+  font-style: italic;
+  margin-left: 10px;
+}
+
 html,
 body {
   color: #fff;

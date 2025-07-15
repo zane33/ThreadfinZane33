@@ -706,6 +706,10 @@ function saveSettings() {
     }
     var data = new Object();
     data["settings"] = newSettings;
+    
+    // Show loading notification for settings save
+    showNotification("Saving settings... Please wait", "info", 10000);
+    
     var server = new Server(cmd);
     server.request(data);
 }

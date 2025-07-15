@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 
 // fileType: Welcher Dateityp soll aktualisiert werden (m3u, hdhr, xml) | fileID: Update einer bestimmten Datei (Provider ID)
 func getProviderData(fileType, fileID string) (err error) {
+
+	showInfo("Provider:" + "getProviderData called with fileType=" + fileType + " fileID=" + fileID)
 
 	var fileExtension, serverFileName string
 	var body = make([]byte, 0)
@@ -216,8 +219,11 @@ func getProviderData(fileType, fileID string) (err error) {
 			if strings.Contains(fileSource, "http://") || strings.Contains(fileSource, "https://") {
 
 				// Laden vom Remote Server
-				showInfo("Download:" + fileSource)
-				serverFileName, body, err = downloadFileFromServer(fileSource, httpProxyUrl)
+				showInfo("Download:" + "Processing file " + fileSource)
+				showInfo("Download:" + "Using proxy " + httpProxyUrl)
+							showInfo("Download:" + "Calling downloadFileFromServer function")
+			serverFileName, body, err = downloadFileFromServer(fileSource, httpProxyUrl)
+			showInfo("Download:" + "downloadFileFromServer function completed")
 
 			} else {
 
@@ -236,17 +242,39 @@ func getProviderData(fileType, fileID string) (err error) {
 
 		if err == nil {
 
+			showInfo("Save Process:Starting save process for " + fileSource)
 			err = saveDateFromProvider(fileSource, serverFileName, dataID, body)
 			if err == nil {
 				showInfo("Save File:" + fileSource + " [ID: " + dataID + "]")
+			} else {
+				showInfo("Save Error:Failed to save file - " + err.Error())
 			}
 
+		} else {
+			showInfo("Download:" + "Failed, will not proceed to save - " + err.Error())
 		}
 
 		if err != nil {
 
 			ShowError(err, 000)
-			var downloadErr = err
+			
+			// Create more specific error messages for different failure types
+			var userFriendlyErr error
+			if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "Client.Timeout") {
+				userFriendlyErr = fmt.Errorf("Failed to download from %s: Request timed out after 30 seconds. Please check if the URL is accessible and try again", fileSource)
+			} else if strings.Contains(err.Error(), "no such host") || strings.Contains(err.Error(), "lookup") {
+				userFriendlyErr = fmt.Errorf("Failed to download from %s: Cannot resolve hostname. Please check the URL and your network connection", fileSource)
+			} else if strings.Contains(err.Error(), "connection refused") {
+				userFriendlyErr = fmt.Errorf("Failed to download from %s: Connection refused. The server may be down or the port blocked", fileSource)
+			} else if strings.Contains(err.Error(), "404") {
+				userFriendlyErr = fmt.Errorf("Failed to download from %s: File not found (404). Please verify the URL is correct", fileSource)
+			} else if strings.Contains(err.Error(), "403") {
+				userFriendlyErr = fmt.Errorf("Failed to download from %s: Access denied (403). You may need authentication or the file is restricted", fileSource)
+			} else if strings.Contains(err.Error(), "500") {
+				userFriendlyErr = fmt.Errorf("Failed to download from %s: Server error (500). The remote server is experiencing issues", fileSource)
+			} else {
+				userFriendlyErr = fmt.Errorf("Failed to download from %s: %s", fileSource, err.Error())
+			}
 
 			if newProvider == false {
 
@@ -260,7 +288,7 @@ func getProviderData(fileType, fileID string) (err error) {
 						showWarning(1011)
 					}
 
-					err = downloadErr
+					err = userFriendlyErr
 				}
 
 				// Fehler Counter um 1 erhöhen
@@ -274,7 +302,7 @@ func getProviderData(fileType, fileID string) (err error) {
 				}
 
 			} else {
-				return downloadErr
+				return userFriendlyErr
 			}
 
 		}
@@ -320,43 +348,58 @@ func getProviderData(fileType, fileID string) (err error) {
 }
 
 func downloadFileFromServer(providerURL string, proxyUrl string) (filename string, body []byte, err error) {
+	showInfo("Download:" + "Start downloading from " + providerURL)
+	
 	_, err = url.ParseRequestURI(providerURL)
 	if err != nil {
+		showInfo("Download:" + "Invalid URL format - " + providerURL)
 		return
 	}
 
-	httpClient := &http.Client{}
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+	}
 
 	if proxyUrl != "" {
+		showInfo("Download:" + "Using proxy " + proxyUrl)
 		proxyURL, err := url.Parse(proxyUrl)
 		if err != nil {
+			showInfo("Download:" + "Invalid proxy URL - " + proxyUrl)
 			return "", nil, err
 		}
 
 		httpClient = &http.Client{
+			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
 				Proxy: http.ProxyURL(proxyURL),
 			},
 		}
 	}
 
+	showInfo("Download:" + "Creating HTTP request for " + providerURL)
 	req, err := http.NewRequest("GET", providerURL, nil)
 	if err != nil {
+		showInfo("Download:" + "Failed to create request - " + err.Error())
 		return
 	}
 
 	req.Header.Set("User-Agent", Settings.UserAgent)
 
+	showInfo("Download:" + "Sending HTTP request to " + providerURL)
 	resp, err := httpClient.Do(req)
 	if err != nil {
+		showInfo("Download:" + "HTTP request failed - " + err.Error())
 		return
 	}
 	defer resp.Body.Close()
 
 	resp.Header.Set("User-Agent", Settings.UserAgent)
 
+	showInfo("Download:" + "Received HTTP response with status " + strconv.Itoa(resp.StatusCode))
+	
 	if resp.StatusCode != http.StatusOK {
 		err = fmt.Errorf("%d: %s %s", resp.StatusCode, providerURL, http.StatusText(resp.StatusCode))
+		showInfo("Download:" + "HTTP status " + strconv.Itoa(resp.StatusCode) + " - " + http.StatusText(resp.StatusCode))
 		return
 	}
 
@@ -369,16 +412,20 @@ func downloadFileFromServer(providerURL string, proxyUrl string) (filename strin
 		var f = strings.Replace(value[1], `"`, "", -1)
 		f = strings.Replace(f, `;`, "", -1)
 		filename = f
-		showInfo("Header filename:" + filename)
+		showInfo("Download:" + "Header filename " + filename)
 	} else {
 		var cleanFilename = strings.SplitN(getFilenameFromPath(providerURL), "?", 2)
 		filename = cleanFilename[0]
+		showInfo("Download:" + "Filename " + filename)
 	}
 
+	showInfo("Download:" + "Reading response body for " + providerURL)
 	body, err = io.ReadAll(resp.Body)
 	if err != nil {
+		showInfo("Download:" + "Failed to read response body - " + err.Error())
 		return
 	}
 
+	showInfo("Download:" + "Successfully downloaded " + strconv.Itoa(len(body)) + " bytes from " + providerURL)
 	return
 }

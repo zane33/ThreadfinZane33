@@ -12,6 +12,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"threadfin/src/internal/authentication"
 
@@ -384,6 +385,7 @@ func WS(w http.ResponseWriter, r *http.Request) {
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
+		HandshakeTimeout: 10 * time.Second,
 		CheckOrigin: func(r *http.Request) bool {
 			// Implement any custom origin validation logic here, if needed.
 			return true
@@ -397,6 +399,14 @@ func WS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set connection timeouts to prevent premature closure during long operations
+	conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
+	conn.SetWriteDeadline(time.Now().Add(5 * time.Minute))
+
+	// Generate a unique connection ID for tracking
+	connID := fmt.Sprintf("conn_%d", time.Now().UnixNano())
+	showInfo("WebSocket:" + "New connection established: " + connID)
+
 	systemMutex.Lock()
 	if Settings.HttpThreadfinDomain != "" {
 		setGlobalDomain(getBaseUrl(Settings.HttpThreadfinDomain, Settings.Port))
@@ -407,19 +417,28 @@ func WS(w http.ResponseWriter, r *http.Request) {
 
 	for {
 
+		showInfo("WebSocket:" + "Connection " + connID + " waiting for next request...")
+		// Reset read deadline before each read to keep connection alive
+		conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
 		err = conn.ReadJSON(&request)
 
 		if err != nil {
+			showInfo("WebSocket:" + "Connection " + connID + " closed due to read error: " + err.Error())
 			return
 		}
 
+		showInfo("WebSocket:" + "Connection " + connID + " received request with command: " + request.Cmd)
+		showInfo("WebSocket:" + "Connection " + connID + " request JSON: " + mapToJSON(request))
+
 		systemMutex.Lock()
+		showInfo("WebSocket:" + "Connection " + connID + " checking authentication...")
 		if System.ConfigurationWizard == false {
 
 			switch Settings.AuthenticationWEB {
 
 			// Token Authentication
 			case true:
+				showInfo("WebSocket:" + "Connection " + connID + " token authentication enabled")
 
 				var token string
 				tokens, ok := r.URL.Query()["Token"]
@@ -430,8 +449,10 @@ func WS(w http.ResponseWriter, r *http.Request) {
 					token = tokens[0]
 				}
 
+				showInfo("WebSocket:" + "Connection " + connID + " token value: " + token)
 				newToken, err = tokenAuthentication(token)
 				if err != nil {
+					showInfo("WebSocket:" + "Connection " + connID + " token authentication failed: " + err.Error())
 					response.Status = false
 					response.Reload = true
 					response.Error = err.Error()
@@ -445,8 +466,12 @@ func WS(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
+				showInfo("WebSocket:" + "Connection " + connID + " token authentication successful")
 				response.Token = newToken
 				response.Users, _ = authentication.GetAllUserData()
+
+			case false:
+				showInfo("WebSocket:" + "Connection " + connID + " no authentication required")
 
 			}
 
@@ -501,13 +526,16 @@ func WS(w http.ResponseWriter, r *http.Request) {
 			updateUrlsJson()
 
 		case "updateFileM3U":
+			showInfo("WebSocket:" + "Connection " + connID + " processing updateFileM3U command")
 			// Reset cache for urls.json
 			var filename = getPlatformFile(System.Folder.Config + "urls.json")
 			saveMapToJSONFile(filename, make(map[string]StreamInfo))
 			Data.Cache.StreamingURLS = make(map[string]StreamInfo)
 
+			showInfo("WebSocket:" + "Connection " + connID + " about to call updateFile function")
 			err = updateFile(request, "m3u")
 			if err == nil {
+				showInfo("WebSocket:" + "Connection " + connID + " updateFile completed successfully")
 				response.OpenMenu = strconv.Itoa(indexOfString("playlist", System.WEB.Menu))
 				// Rebuild XEPG database to ensure URLs are updated
 				err = createXEPGDatabase()
@@ -519,6 +547,9 @@ func WS(w http.ResponseWriter, r *http.Request) {
 				updateUrlsJson()
 				// Create M3U file to ensure URLs are properly generated
 				createM3UFile()
+				showInfo("WebSocket:" + "Connection " + connID + " updateFileM3U processing completed")
+			} else {
+				showInfo("WebSocket:" + "Connection " + connID + " updateFile failed with error: " + err.Error())
 			}
 
 		case "saveFilesHDHR":
@@ -645,9 +676,21 @@ func WS(w http.ResponseWriter, r *http.Request) {
 			response.ConfigurationWizard = System.ConfigurationWizard
 		}
 
+		showInfo("WebSocket:" + "Connection " + connID + " sending response back to client")
+		// Reset write deadline before sending response
+		conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 		if err = conn.WriteJSON(response); err != nil {
 			ShowError(err, 1022)
+			showInfo("WebSocket:" + "Connection " + connID + " failed to send response: " + err.Error())
 		} else {
+			showInfo("WebSocket:" + "Connection " + connID + " response sent successfully")
+			// For long-running operations, add a longer delay to ensure the client receives the response
+			// before closing the connection
+			if request.Cmd == "updateFileM3U" || request.Cmd == "updateFileXMLTV" || request.Cmd == "updateFileHDHR" {
+				time.Sleep(2000 * time.Millisecond)
+			} else {
+				time.Sleep(500 * time.Millisecond)
+			}
 			break
 		}
 

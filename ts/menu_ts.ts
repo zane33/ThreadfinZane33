@@ -2674,7 +2674,7 @@ function savePopupData(dataType: string, id: string, remove: Boolean, option: nu
   var server: Server = new Server(cmd)
   server.request(data)
 
-  showElement("loading", false)
+  // Don't dismiss loading here - let the response handler do it
 
 }
 
