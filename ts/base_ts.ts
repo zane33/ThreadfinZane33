@@ -370,6 +370,13 @@ function sortTable(column, table_name = "content_table") {
 function createSearchObj() {
 
   SEARCH_MAPPING = new Object()
+  
+  // Safety check to ensure SERVER data is loaded
+  if (!SERVER || !SERVER["xepg"] || !SERVER["xepg"]["epgMapping"]) {
+    console.log("DEBUG: SERVER data not ready yet, skipping search object creation");
+    return;
+  }
+  
   var data = SERVER["xepg"]["epgMapping"]
   var channels = getObjKeys(data)
 
@@ -735,9 +742,13 @@ function checkUndo(key: string) {
   switch (key) {
     case "epgMapping":
       if (UNDO.hasOwnProperty(key)) {
-        SERVER["xepg"][key] = JSON.parse(JSON.stringify(UNDO[key]))
+        if (SERVER && SERVER["xepg"] && SERVER["xepg"][key] !== undefined) {
+          SERVER["xepg"][key] = JSON.parse(JSON.stringify(UNDO[key]))
+        }
       } else {
-        UNDO[key] = JSON.parse(JSON.stringify(SERVER["xepg"][key]));
+        if (SERVER && SERVER["xepg"] && SERVER["xepg"][key] !== undefined) {
+          UNDO[key] = JSON.parse(JSON.stringify(SERVER["xepg"][key]));
+        }
       }
       break;
 

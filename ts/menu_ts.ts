@@ -1098,9 +1098,10 @@ function PageReady() {
   var server: Server = new Server("getServerConfig")
   server.request(new Object())
 
+  // Reduced frequency: Update every 30 seconds instead of 10 seconds
   setInterval(function () {
     updateLog()
-  }, 10000);
+  }, 30000);
 
 
   return

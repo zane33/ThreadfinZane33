@@ -94,6 +94,12 @@ ARG OS_VERSION=ubuntu
 ARG OS_CODENAME=noble
 
 # Install dependencies in a single layer
+# Workaround for Ubuntu GPG key issues
+RUN apt-get update || true && \
+    apt-get install -y --no-install-recommends gnupg ca-certificates && \
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 3B4FE6ACC0B21F32 || true && \
+    apt-get update || true
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -102,7 +108,9 @@ RUN apt-get update && \
     vlc \
     tzdata \
     gnupg \
-    apt-transport-https && \
+    apt-transport-https \
+    openssl \
+    libssl3 && \
     mkdir -p $THREADFIN_BIN $THREADFIN_CONF $THREADFIN_TEMP $THREADFIN_HOME/cache && \
     chmod a+rwX $THREADFIN_CONF $THREADFIN_TEMP && \
     sed -i 's/geteuid/getppid/' /usr/bin/vlc && \
@@ -127,7 +135,6 @@ RUN chmod +rx $THREADFIN_BIN/threadfin
 
 # Configure container volume mappings
 VOLUME $THREADFIN_CONF
-VOLUME $THREADFIN_TEMP
 
 EXPOSE $THREADFIN_PORT
 

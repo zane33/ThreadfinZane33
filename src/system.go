@@ -265,8 +265,30 @@ func saveSettings(settings SettingsStruct) (err error) {
 
 // Zugriff über die Domain ermöglichen
 func setGlobalDomain(domain string) {
+	if domain == "" {
+		fmt.Printf("Error: empty domain provided to setGlobalDomain\n")
+		return
+	}
 
+	showDebug(fmt.Sprintf("Setting global domain to: %s", domain), 1)
 	System.Domain = domain
+
+	// Set default protocols if not already set
+	if System.ServerProtocol.XML == "" {
+		System.ServerProtocol.XML = "http"
+	}
+	if System.ServerProtocol.M3U == "" {
+		System.ServerProtocol.M3U = "http"
+	}
+	if System.ServerProtocol.DVR == "" {
+		System.ServerProtocol.DVR = "http"
+	}
+	if System.ServerProtocol.WEB == "" {
+		System.ServerProtocol.WEB = "http"
+	}
+	if System.ServerProtocol.API == "" {
+		System.ServerProtocol.API = "http"
+	}
 
 	switch Settings.AuthenticationPMS {
 	case true:
@@ -294,6 +316,7 @@ func setGlobalDomain(domain string) {
 		System.Addresses.XML = getErrMsg(2106)
 	}
 
+	showDebug(fmt.Sprintf("Domain set - XML URL: %s", System.Addresses.XML), 1)
 	return
 }
 

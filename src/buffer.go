@@ -149,9 +149,15 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 	var timeOut = 0
 	var newStream = true
 
-	//w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Connection", "close")
+	// Add request debugging
+	clientIP := getClientIP(r)
+	showDebug(fmt.Sprintf("New streaming request from IP: %s, User-Agent: %s", clientIP, r.UserAgent()), 1)
+
+	// Set connection to keep-alive for better streaming performance
+	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Pragma", "no-cache")
 
 	// Check whether the playlist is already in use
 	Lock.Lock()
@@ -278,13 +284,21 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 				}
 
 			}
+		} else {
+			showDebug("OneRequestPerTuner enabled - each request gets its own stream", 1)
 		}
 
 		// New stream for an already active playlist
 		if newStream {
 
 			// Check if the playlist allows another stream (Tuner)
-			if len(playlist.Streams) >= playlist.Tuner {
+			// With OneRequestPerTuner enabled, each request gets its own stream slot
+			tunerLimit := playlist.Tuner
+			if Settings.OneRequestPerTuner {
+				showDebug(fmt.Sprintf("OneRequestPerTuner enabled - Current streams: %d, Tuner limit: %d", len(playlist.Streams), tunerLimit), 2)
+			}
+
+			if len(playlist.Streams) >= tunerLimit {
 				// If there are backup URLs, use them
 				if backupStream1 != nil {
 					bufferingStream(backupStream1.PlaylistID, backupStream1.URL, nil, backupStream2, backupStream3, channelName, w, r)
@@ -361,22 +375,30 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 		BufferInformation.Store(playlistID, playlist)
 		Lock.Unlock()
 
-		switch playlist.Buffer {
-
-		case "ffmpeg", "vlc":
-			go thirdPartyBuffer(streamID, playlistID, false, 0)
-
-		default:
-			break
-
-		}
-
-		showInfo(fmt.Sprintf("Streaming Status 1:Playlist: %s - Tuner: %d / %d", playlist.PlaylistName, len(playlist.Streams), playlist.Tuner))
-
+		// Create client connection first
 		var clients ClientConnection
 		clients.Connection = 1
 		BufferClients.Store(playlistID+stream.MD5, clients)
 
+		showInfo(fmt.Sprintf("Streaming Status 1:Playlist: %s - Tuner: %d / %d", playlist.PlaylistName, len(playlist.Streams), playlist.Tuner))
+
+		// Start the buffer in a goroutine immediately
+		go thirdPartyBuffer(streamID, playlistID, false, 0)
+
+	} else if newStream {
+		// Stream is already active, just update client count
+		if c, ok := BufferClients.Load(playlistID + stream.MD5); ok {
+			var clients = c.(ClientConnection)
+			clients.Connection++
+			BufferClients.Store(playlistID+stream.MD5, clients)
+			showInfo(fmt.Sprintf("Streaming Status:Channel: %s (Clients: %d)", stream.ChannelName, clients.Connection))
+		} else {
+			// Client connection not found, create it
+			var clients ClientConnection
+			clients.Connection = 1
+			BufferClients.Store(playlistID+stream.MD5, clients)
+			showInfo(fmt.Sprintf("Streaming Status:Channel: %s (Clients: %d) - Created new connection", stream.ChannelName, clients.Connection))
+		}
 	}
 
 	w.WriteHeader(200)
@@ -393,17 +415,32 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 
 					timeOut++
 
-					time.Sleep(time.Duration(100) * time.Millisecond)
+					// Send a heartbeat to keep the client connection alive
+					if timeOut%20 == 0 { // Every 1 second (20 * 50ms)
+						w.Header().Set("Content-type", "video/mpeg")
+						w.Header().Set("Content-Length", "0")
+						w.Write([]byte{})
+						if flusher, ok := w.(http.Flusher); ok {
+							flusher.Flush()
+						}
+					}
+
+					time.Sleep(time.Duration(50) * time.Millisecond)
 
 					if c, ok := BufferClients.Load(playlistID + stream.MD5); ok {
 
 						var clients = c.(ClientConnection)
 
-						if clients.Error != nil || (timeOut > 200 && (playlist.Streams[streamID].BackupChannel1 == nil && playlist.Streams[streamID].BackupChannel2 == nil && playlist.Streams[streamID].BackupChannel3 == nil)) {
+						if clients.Error != nil || (timeOut > 150 && (playlist.Streams[streamID].BackupChannel1 == nil && playlist.Streams[streamID].BackupChannel2 == nil && playlist.Streams[streamID].BackupChannel3 == nil)) {
+							showDebug(fmt.Sprintf("Stream timeout or error after %d attempts", timeOut), 1)
 							killClientConnection(streamID, stream.PlaylistID, false)
 							return
 						}
 
+					} else {
+						// Client connection not found, but don't exit immediately
+						// This might be a timing issue during stream initialization
+						showDebug("Client connection not found during stream initialization, continuing...", 1)
 					}
 
 					continue
@@ -411,37 +448,44 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 
 				var oldSegments []string
 
+				var connectionCheckCounter = 0
 				for { // Loop 2: Temporary files are present, data can be sent to the client
 
-					// Monitor HTTP client connection
+					// Monitor HTTP client connection - check less frequently to avoid premature disconnections
+					connectionCheckCounter++
+					if connectionCheckCounter%50 == 0 { // Check every 50 iterations instead of every iteration
+						ctx := r.Context()
+						if ok {
 
-					ctx := r.Context()
-					if ok {
+							select {
 
-						select {
-
-						case <-ctx.Done():
-							killClientConnection(streamID, playlistID, false)
-							return
-
-						default:
-							if c, ok := BufferClients.Load(playlistID + stream.MD5); ok {
-
-								var clients = c.(ClientConnection)
-								if clients.Error != nil {
-									ShowError(clients.Error, 0)
-									killClientConnection(streamID, playlistID, false)
-									return
-								}
-
-							} else {
-
+							case <-ctx.Done():
+								showDebug("Client context cancelled, killing connection", 1)
+								killClientConnection(streamID, playlistID, false)
 								return
+
+							default:
+								if c, ok := BufferClients.Load(playlistID + stream.MD5); ok {
+
+									var clients = c.(ClientConnection)
+									if clients.Error != nil {
+										ShowError(clients.Error, 0)
+										killClientConnection(streamID, playlistID, false)
+										return
+									}
+
+								} else {
+									// Don't return immediately if client connection is not found
+									// This might be a timing issue, wait a bit and retry
+									showDebug("Client connection not found, waiting...", 1)
+									time.Sleep(time.Duration(100) * time.Millisecond)
+									continue
+
+								}
 
 							}
 
 						}
-
 					}
 
 					if _, err := bufferVFS.Stat(stream.Folder); fsIsNotExistErr(err) {
@@ -493,7 +537,7 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 										//w.Header().Set("Content-type", "video/mpeg")
 										w.Header().Set("Content-type", contentType)
 										w.Header().Set("Content-Length", "0")
-										w.Header().Set("Connection", "close")
+										w.Header().Set("Connection", "keep-alive")
 
 									}
 
@@ -507,9 +551,15 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 									_, err := w.Write(buffer)
 
 									if err != nil {
+										showDebug(fmt.Sprintf("HTTP write error: %v", err), 1)
 										file.Close()
 										killClientConnection(streamID, playlistID, false)
 										return
+									}
+
+									// Flush the response writer to ensure data is sent immediately
+									if flusher, ok := w.(http.Flusher); ok {
+										flusher.Flush()
 									}
 
 									file.Close()
@@ -676,12 +726,14 @@ func clientConnection(stream ThisStream) (status bool) {
 	defer Lock.Unlock()
 
 	if _, ok := BufferClients.Load(stream.PlaylistID + stream.MD5); !ok {
-
-		var debug = fmt.Sprintf("Streaming Status:Remove temporary files (%s)", stream.Folder)
+		// Only remove the stream if it's been inactive for a longer period
+		// This prevents premature removal of active streams
+		var debug = fmt.Sprintf("Streaming Status:No client connection found for stream (%s)", stream.Folder)
 		showDebug(debug, 1)
 
 		status = false
 
+		// Only remove temp files if we're sure the client is gone
 		debug = fmt.Sprintf("Remove tmp folder:%s", stream.Folder)
 		showDebug(debug, 1)
 
@@ -689,24 +741,19 @@ func clientConnection(stream ThisStream) (status bool) {
 			ShowError(err, 4005)
 		}
 
-		if p, ok := BufferInformation.Load(stream.PlaylistID); !ok {
+		if p, ok := BufferInformation.Load(stream.PlaylistID); ok {
+			var playlist = p.(Playlist)
 
 			showInfo(fmt.Sprintf("Streaming Status:Channel: %s - No client is using this channel anymore. Streaming Server connection has ended", stream.ChannelName))
 
-			if p != nil {
-				var playlist = p.(Playlist)
+			showInfo(fmt.Sprintf("Streaming Status:Playlist: %s - Tuner: %d / %d", playlist.PlaylistName, len(playlist.Streams), playlist.Tuner))
 
-				showInfo(fmt.Sprintf("Streaming Status:Playlist: %s - Tuner: %d / %d", playlist.PlaylistName, len(playlist.Streams), playlist.Tuner))
-
-				if len(playlist.Streams) <= 0 {
-					BufferInformation.Delete(stream.PlaylistID)
-				}
+			if len(playlist.Streams) <= 0 {
+				BufferInformation.Delete(stream.PlaylistID)
 			}
-
 		}
 
 		status = false
-
 	}
 
 	return
@@ -1231,6 +1278,15 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 		cmd.Start()
 		defer cmd.Wait()
 
+		// Add error handling for command start
+		if cmd.Process == nil {
+			err = errors.New("Failed to start " + bufferType + " process")
+			ShowError(err, 0)
+			killClientConnection(streamID, playlistID, false)
+			addErrorToStream(err)
+			return
+		}
+
 		go func() {
 
 			// Display log data from the process in debug mode 1.
@@ -1292,9 +1348,21 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 
 			select {
 			case timeout := <-t:
-				if timeout >= 20 && tmpSegment == 1 {
+				// Increased timeout for M3U8 streams - they can take longer to establish
+				if timeout >= 60 && tmpSegment == 1 {
 					cmd.Process.Kill()
-					err = errors.New("Timeout")
+					err = errors.New("Stream initialization timeout after 60 seconds")
+					ShowError(err, 4006)
+					killClientConnection(streamID, playlistID, false)
+					addErrorToStream(err)
+					cmd.Wait()
+					f.Close()
+					return
+				}
+				// For established streams, allow longer timeout for temporary network issues
+				if timeout >= 300 && tmpSegment > 1 {
+					cmd.Process.Kill()
+					err = errors.New("Stream timeout after 5 minutes of inactivity")
 					ShowError(err, 4006)
 					killClientConnection(streamID, playlistID, false)
 					addErrorToStream(err)
@@ -1311,19 +1379,35 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 				showInfo("Streaming Status:Receive data from " + bufferType)
 			}
 
-			if !clientConnection(stream) {
-				cmd.Process.Kill()
-				f.Close()
-				cmd.Wait()
-				return
+			// Check client connection less frequently to avoid premature disconnections
+			if tmpSegment%100 == 0 { // Check every 100 iterations instead of every 50
+				if !clientConnection(stream) {
+					cmd.Process.Kill()
+					f.Close()
+					cmd.Wait()
+					return
+				}
 			}
 
 			n, err := reader.Read(buffer)
 			if err == io.EOF {
+				showDebug("FFMPEG: End of stream reached", 1)
 				break
 			}
+			if err != nil {
+				showDebug(fmt.Sprintf("FFMPEG: Read error: %v", err), 1)
+				// Don't break immediately on read errors, they might be temporary
+				time.Sleep(time.Duration(100) * time.Millisecond)
+				continue
+			}
 
-			fileSize = fileSize + len(buffer[:n])
+			if n == 0 {
+				// No data read, wait a bit before trying again
+				time.Sleep(time.Duration(50) * time.Millisecond)
+				continue
+			}
+
+			fileSize = fileSize + n
 
 			if _, err := f.Write(buffer[:n]); err != nil {
 				cmd.Process.Kill()
@@ -1351,6 +1435,12 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 					playlist.Streams[streamID] = stream
 					BufferInformation.Store(playlistID, playlist)
 					Lock.Unlock()
+
+					// Update client connection to show stream is active
+					if c, ok := BufferClients.Load(playlistID + stream.MD5); ok {
+						var clients = c.(ClientConnection)
+						showInfo(fmt.Sprintf("Streaming Status:Channel: %s (Clients: %d) - Stream Active", stream.ChannelName, clients.Connection))
+					}
 				}
 
 				tmpFile = fmt.Sprintf("%s%d.ts", tmpFolder, tmpSegment)

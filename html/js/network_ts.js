@@ -1,102 +1,70 @@
-class Server {
-    constructor(cmd) {
-        this.cmd = cmd;
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
+function getCookie(name) {
+    var value = "; " + document.cookie;
+    var parts = value.split("; " + name + "=");
+    if (parts.length == 2)
+        return parts.pop().split(";").shift();
+    return "";
+}
+// WebSocket connection manager for efficient connection reuse
+var WebSocketManager = /** @class */ (function () {
+    function WebSocketManager() {
+        this.ws = null;
+        this.url = "";
+        this.pendingRequests = new Map();
+        this.reconnectTimer = null;
+        this.lastCmd = "";
     }
-    request(data) {
-        // Generate unique request ID for this specific request
-        var requestId = Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-        console.log("DEBUG: Starting request:", requestId, data);
-        
-        // Only block rapid duplicate requests of the same command (prevent double-clicking)
-        var requestKey = data.cmd + "_" + (data.files ? JSON.stringify(data.files) : "");
-        var now = Date.now();
-        console.log("DEBUG: Request key:", requestKey, "Last request time:", window.lastRequestTime, "Now:", now);
-        if (window.lastRequestTime && window.lastRequestKey === requestKey && 
-            (now - window.lastRequestTime) < 1000) {
-            console.log("DEBUG: Blocking duplicate request within 1 second:", requestKey);
+    WebSocketManager.getInstance = function () {
+        if (!WebSocketManager.instance) {
+            WebSocketManager.instance = new WebSocketManager();
+        }
+        return WebSocketManager.instance;
+    };
+    WebSocketManager.prototype.createUrl = function () {
+        var protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+        return protocol + window.location.hostname + ":" + window.location.port + "/data/" + "?Token=" + getCookie("Token");
+    };
+    WebSocketManager.prototype.connect = function () {
+        var _this = this;
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             return;
         }
-        window.lastRequestTime = now;
-        window.lastRequestKey = requestKey;
-        console.log("DEBUG: Request allowed to proceed");
-        
-        console.log(data);
-        
-        // Add timeout for this specific request - longer timeout for update operations
-        var timeoutDuration = 45000; // Default 45 seconds
-        if (this.cmd === "updateFileM3U" || this.cmd === "updateFileXMLTV" || this.cmd === "updateFileHDHR") {
-            timeoutDuration = 300000; // 5 minutes for update operations
-        }
-        var connectionTimeout = setTimeout(function() {
-            console.log("WebSocket connection timeout for request:", requestId);
-            showElement("loading", false);
-            // showNotification("Connection timeout. Please try again.", "error", 5000);
-        }, timeoutDuration);
-        
-        if (this.cmd != "updateLog") {
-            // showElement("loading", true)
-            UNDO = new Object();
-        }
-        switch (window.location.protocol) {
-            case "http:":
-                this.protocol = "ws://";
-                break;
-            case "https:":
-                this.protocol = "wss://";
-                break;
-        }
-        var url = this.protocol + window.location.hostname + ":" + window.location.port + "/data/" + "?Token=" + getCookie("Token");
-        console.log("DEBUG: WebSocket URL:", url);
-        data["cmd"] = this.cmd;
-        console.log("DEBUG: About to create WebSocket connection");
-        var ws = new WebSocket(url);
-        console.log("DEBUG: WebSocket created, setting up event handlers");
-        ws.onopen = function () {
+        this.url = this.createUrl();
+        this.ws = new WebSocket(this.url);
+        this.ws.onopen = function () {
+            console.log("DEBUG: Persistent WebSocket connection established");
             WS_AVAILABLE = true;
-            console.log("DEBUG: WebSocket connected successfully for request:", requestId);
-            console.log("DEBUG: REQUEST (JS):");
-            console.log(data);
-            console.log("DEBUG: REQUEST: (JSON)");
-            console.log(JSON.stringify(data));
-            console.log("DEBUG: Sending data to server");
-            this.send(JSON.stringify(data));
-            console.log("DEBUG: Data sent to server");
-        };
-        ws.onerror = function (e) {
-            console.log("DEBUG: WebSocket error occurred for request:", requestId);
-            console.log("DEBUG: Error event:", e);
-            console.log("DEBUG: No websocket connection to Threadfin could be established. Check your network configuration.");
-            clearTimeout(connectionTimeout);
-            if (WS_AVAILABLE == false) {
-                // showNotification("No websocket connection to Threadfin could be established. Check your network configuration.", "error", 10000);
+            if (_this.reconnectTimer) {
+                clearTimeout(_this.reconnectTimer);
+                _this.reconnectTimer = null;
             }
         };
-        ws.onmessage = function (e) {
-            console.log("DEBUG: WebSocket message received for request:", requestId);
-            clearTimeout(connectionTimeout);
-            console.log("DEBUG: RESPONSE:");
+        this.ws.onmessage = function (e) {
             var response = JSON.parse(e.data);
-            console.log("DEBUG: Parsed response:", response);
+            // Handle token updates
             if (response.hasOwnProperty("token")) {
                 document.cookie = "Token=" + response["token"];
             }
+            // Handle error responses
             if (response["status"] == false) {
-                // Dismiss loading on error
-                showElement("loading", false);
-                
-                // Dismiss any loading notifications
-                var existingNotifications = document.querySelectorAll('.error-notification.info');
-                existingNotifications.forEach(function(notification) {
-                    notification.remove();
-                });
-                
-                // showNotification(response["err"], "error", 10000);
-                console.log("DEBUG: Error response:", response["err"]);
+                alert(response["err"]);
                 if (response.hasOwnProperty("reload")) {
                     location.reload();
                 }
                 return;
             }
+            // Handle probe info
             if (response.hasOwnProperty("probeInfo")) {
                 if (document.getElementById("probeDetails")) {
                     if (response["probeInfo"]["resolution"] !== undefined) {
@@ -104,113 +72,246 @@ class Server {
                     }
                 }
             }
+            // Handle logo URL
             if (response.hasOwnProperty("logoURL")) {
                 var div = document.getElementById("channel-icon");
                 div.value = response["logoURL"];
                 div.className = "changed";
                 return;
             }
-            switch (data["cmd"]) {
-                case "updateLog":
-                    SERVER["log"] = response["log"];
-                    if (document.getElementById("content_log")) {
-                        showLogs(false);
-                    }
-                    if (document.getElementById("playlist-connection-information")) {
-                        let activeClass = "text-primary";
-                        if (response["clientInfo"]["activePlaylist"] / response["clientInfo"]["totalPlaylist"] >= 0.6 && response["clientInfo"]["activePlaylist"] / response["clientInfo"]["totalPlaylist"] < 0.8) {
-                            activeClass = "text-warning";
-                        }
-                        else if (response["clientInfo"]["activePlaylist"] / response["clientInfo"]["totalPlaylist"] >= 0.8) {
-                            activeClass = "text-danger";
-                        }
-                        document.getElementById("playlist-connection-information").innerHTML = "Playlist Connections: <span class='" + activeClass + "'>" + response["clientInfo"]["activePlaylist"] + " / " + response["clientInfo"]["totalPlaylist"] + "</span>";
-                    }
-                    if (document.getElementById("client-connection-information")) {
-                        let activeClass = "text-primary";
-                        if (response["clientInfo"]["activeClients"] / response["clientInfo"]["totalClients"] >= 0.6 && response["clientInfo"]["activeClients"] / response["clientInfo"]["totalClients"] < 0.8) {
-                            activeClass = "text-warning";
-                        }
-                        else if (response["clientInfo"]["activeClients"] / response["clientInfo"]["totalClients"] >= 0.8) {
-                            activeClass = "text-danger";
-                        }
-                        document.getElementById("client-connection-information").innerHTML = "Client Connections: <span class='" + activeClass + "'>" + response["clientInfo"]["activeClients"] + " / " + response["clientInfo"]["totalClients"] + "</span>";
-                    }
-                    return;
-                    break;
-                default:
-                    SERVER = new Object();
-                    SERVER = response;
-                    break;
+            // Get the last command that was sent
+            var cmd = _this.getLastCmd();
+            // Call any pending callbacks for the specific command
+            var callback = _this.pendingRequests.get(cmd);
+            if (callback) {
+                callback(response);
+                _this.pendingRequests.delete(cmd);
             }
-            if (response.hasOwnProperty("openMenu")) {
-                var menu = document.getElementById(response["openMenu"]);
-                menu.click();
-                showElement("popup", false);
-                showElement("loading", false);
-                
-                // Dismiss any loading notifications
-                var existingNotifications = document.querySelectorAll('.error-notification.info');
-                existingNotifications.forEach(function(notification) {
-                    notification.remove();
-                });
-                
-                // Show success notification for all save operations
-                if (data["cmd"] === "saveFilesM3U" || data["cmd"] === "updateFileM3U") {
-                    // showNotification("Playlist saved successfully!", "success", 3000);
-                    console.log("DEBUG: Playlist saved successfully!");
-                } else if (data["cmd"] === "saveFilesXMLTV" || data["cmd"] === "updateFileXMLTV") {
-                    // showNotification("XMLTV file saved successfully!", "success", 3000);
-                    console.log("DEBUG: XMLTV file saved successfully!");
-                } else if (data["cmd"] === "saveSettings") {
-                    // showNotification("Settings saved successfully!", "success", 3000);
-                    console.log("DEBUG: Settings saved successfully!");
-                } else if (data["cmd"] === "saveFilter") {
-                    // showNotification("Filter saved successfully!", "success", 3000);
-                    console.log("DEBUG: Filter saved successfully!");
-                } else if (data["cmd"] === "saveUserData" || data["cmd"] === "saveNewUser") {
-                    // showNotification("User saved successfully!", "success", 3000);
-                    console.log("DEBUG: User saved successfully!");
-                } else if (data["cmd"] === "saveEpgMapping") {
-                    // showNotification("EPG mapping saved successfully!", "success", 3000);
-                    console.log("DEBUG: EPG mapping saved successfully!");
-                } else if (data["cmd"] === "saveFilesHDHR" || data["cmd"] === "updateFileHDHR") {
-                    // showNotification("HDHomeRun tuner saved successfully!", "success", 3000);
-                    console.log("DEBUG: HDHomeRun tuner saved successfully!");
+            else {
+                // Process response for specific commands like updateLog
+                _this.processResponse(cmd, response);
+            }
+        };
+        this.ws.onerror = function (e) {
+            console.log("DEBUG: WebSocket error, will attempt reconnect");
+            WS_AVAILABLE = false;
+            if (WS_AVAILABLE == false) {
+                alert("No websocket connection to Threadfin could be established. Check your network configuration.");
+            }
+        };
+        this.ws.onclose = function () {
+            console.log("DEBUG: WebSocket connection closed, scheduling reconnect");
+            WS_AVAILABLE = false;
+            _this.ws = null;
+            // Reconnect after 5 seconds
+            if (!_this.reconnectTimer) {
+                _this.reconnectTimer = setTimeout(function () {
+                    _this.connect();
+                }, 5000);
+            }
+        };
+    };
+    WebSocketManager.prototype.getLastCmd = function () {
+        return this.lastCmd;
+    };
+    WebSocketManager.prototype.processResponse = function (cmd, response) {
+        switch (cmd) {
+            case "updateLog":
+                if (response.hasOwnProperty("log")) {
+                    createClintInfo(response["log"]);
                 }
+                return;
+            case "getServerConfig":
+                console.log("KEYS: ", getObjKeys(response));
+                SERVER = response;
+                if (response.hasOwnProperty("settings")) {
+                    console.log("SETTINGS");
+                    createLayout();
+                }
+                if (response.hasOwnProperty("token")) {
+                    console.log("TOKEN");
+                }
+                return;
+            default:
+                // Handle other commands
+                SERVER = response;
+                if (response.hasOwnProperty("settings")) {
+                    createLayout();
+                }
+                break;
+        }
+        // Callbacks are handled in onmessage handler
+    };
+    WebSocketManager.prototype.sendRequest = function (cmd, data, callback) {
+        var _this = this;
+        this.lastCmd = cmd;
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            this.connect();
+            // Retry after connection is established
+            setTimeout(function () { return _this.sendRequest(cmd, data, callback); }, 1000);
+            return;
+        }
+        var requestData = __assign(__assign({}, data), { cmd: cmd });
+        if (callback) {
+            this.pendingRequests.set(cmd, callback);
+        }
+        // Only log non-updateLog requests to reduce noise
+        if (cmd !== "updateLog") {
+            console.log("DEBUG: Sending request:", cmd);
+            console.log("DEBUG: Request data:", requestData);
+        }
+        this.ws.send(JSON.stringify(requestData));
+    };
+    return WebSocketManager;
+}());
+var Server = /** @class */ (function () {
+    function Server(cmd) {
+        this.cmd = cmd;
+        this.wsManager = WebSocketManager.getInstance();
+    }
+    Server.prototype.request = function (data) {
+        var _this = this;
+        // For save operations, use original one-time WebSocket connections
+        // This ensures compatibility with server expectations
+        if (this.cmd.startsWith("save") || this.cmd.includes("File")) {
+            this.createOriginalWebSocket(data);
+            return;
+        }
+        // Prevent multiple simultaneous non-updateLog requests
+        if (SERVER_CONNECTION == true && this.cmd !== "updateLog") {
+            return;
+        }
+        if (this.cmd !== "updateLog") {
+            SERVER_CONNECTION = true;
+            UNDO = new Object();
+            // showElement("loading", true);
+        }
+        // Use efficient WebSocket manager for other requests
+        this.wsManager.sendRequest(this.cmd, data, function (response) {
+            _this.handleResponse(response);
+        });
+    };
+    Server.prototype.createOriginalWebSocket = function (data) {
+        var _this = this;
+        if (this.cmd !== "updateLog") {
+            SERVER_CONNECTION = true;
+            UNDO = new Object();
+            showElement("loading", true);
+        }
+        var protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+        var url = protocol + window.location.hostname + ":" + window.location.port + "/data/" + "?Token=" + getCookie("Token");
+        var requestData = __assign(__assign({}, data), { cmd: this.cmd });
+        var ws = new WebSocket(url);
+        ws.onopen = function () {
+            console.log("DEBUG: One-time WebSocket connection for:", _this.cmd);
+            ws.send(JSON.stringify(requestData));
+        };
+        ws.onmessage = function (e) {
+            var response = JSON.parse(e.data);
+            console.log("DEBUG: One-time WebSocket response for:", _this.cmd);
+            _this.handleResponse(response);
+            ws.close();
+        };
+        ws.onerror = function (e) {
+            console.log("DEBUG: One-time WebSocket error for:", _this.cmd);
+            if (_this.cmd !== "updateLog") {
+                SERVER_CONNECTION = false;
+                showElement("loading", false);
             }
-            if (response.hasOwnProperty("openLink")) {
-                window.location = response["openLink"];
-            }
-            if (response.hasOwnProperty("alert")) {
-                alert(response["alert"]);
-            }
+        };
+        ws.onclose = function () {
+            console.log("DEBUG: One-time WebSocket closed for:", _this.cmd);
+        };
+    };
+    Server.prototype.handleResponse = function (response) {
+        if (this.cmd !== "updateLog") {
+            SERVER_CONNECTION = false;
+            showElement("loading", false);
+            // Only log non-updateLog responses to reduce noise
+            console.log("DEBUG: Response received for:", this.cmd);
+            console.log("DEBUG: Response data:", response);
+        }
+        // Process the response using the same logic as the old implementation
+        this.processOldStyleResponse(response);
+    };
+    Server.prototype.processOldStyleResponse = function (response) {
+        // Handle error responses
+        if (response["status"] == false) {
+            alert(response["err"]);
             if (response.hasOwnProperty("reload")) {
                 location.reload();
             }
-            if (response.hasOwnProperty("wizard")) {
-                createLayout();
-                configurationWizard[response["wizard"]].createWizard();
-                return;
+            return;
+        }
+        // Handle probe info
+        if (response.hasOwnProperty("probeInfo")) {
+            if (document.getElementById("probeDetails")) {
+                if (response["probeInfo"]["resolution"] !== undefined) {
+                    document.getElementById("probeDetails").innerHTML = "<p>Resolution: <span class='text-primary'>" + response["probeInfo"]["resolution"] + "</span></p><p>Frame Rate: <span class='text-primary'>" + response["probeInfo"]["frameRate"] + " FPS</span></p><p>Audio: <span class='text-primary'>" + response["probeInfo"]["audioChannel"] + "</span></p>";
+                }
             }
-            // Dismiss loading for any remaining cases
+        }
+        // Handle logo URL
+        if (response.hasOwnProperty("logoURL")) {
+            var div = document.getElementById("channel-icon");
+            div.value = response["logoURL"];
+            div.className = "changed";
+            return;
+        }
+        // Handle openMenu responses (for save operations)
+        if (response.hasOwnProperty("openMenu")) {
+            var menu = document.getElementById(response["openMenu"]);
+            if (menu) {
+                menu.click();
+            }
+            showElement("popup", false);
             showElement("loading", false);
-            createLayout();
-        };
-        ws.onclose = function (e) {
-            console.log("WebSocket connection closed for request:", requestId);
-            console.log("Close code:", e.code, "Close reason:", e.reason);
-            clearTimeout(connectionTimeout);
-            if (e.code !== 1000) {
-                // showNotification("Connection closed unexpectedly. Please try again.", "error", 5000);
-                console.log("DEBUG: Connection closed unexpectedly. Please try again.");
-            }
-        };
-    }
-}
-function getCookie(name) {
-    var value = "; " + document.cookie;
-    var parts = value.split("; " + name + "=");
-    if (parts.length == 2)
-        return parts.pop().split(";").shift();
-}
+            return;
+        }
+        // Handle openLink responses
+        if (response.hasOwnProperty("openLink")) {
+            window.location.href = response["openLink"];
+            return;
+        }
+        // Handle alert responses
+        if (response.hasOwnProperty("alert")) {
+            alert(response["alert"]);
+        }
+        // Handle reload responses
+        if (response.hasOwnProperty("reload")) {
+            location.reload();
+            return;
+        }
+        // Process based on the command that was sent
+        switch (this.cmd) {
+            case "getServerConfig":
+                console.log("KEYS: ", getObjKeys(response));
+                SERVER = response;
+                if (response.hasOwnProperty("settings")) {
+                    console.log("SETTINGS");
+                    createLayout();
+                }
+                if (response.hasOwnProperty("token")) {
+                    console.log("TOKEN");
+                }
+                break;
+            case "saveFilesM3U":
+            case "saveFilesXMLTV":
+            case "saveFilesHDHR":
+            case "saveUserData":
+            case "saveNewUser":
+                // For save operations, update SERVER and refresh menu
+                SERVER = response;
+                createLayout();
+                break;
+            default:
+                // For other commands, just update SERVER
+                SERVER = response;
+                if (response.hasOwnProperty("settings")) {
+                    createLayout();
+                }
+                break;
+        }
+    };
+    return Server;
+}());

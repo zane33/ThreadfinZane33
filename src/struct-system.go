@@ -2,6 +2,15 @@ package src
 
 import "threadfin/src/internal/imgcache"
 
+// ServerProtocolStruct : Protocol settings for different server endpoints
+type ServerProtocolStruct struct {
+	API string
+	DVR string
+	M3U string
+	WEB string
+	XML string
+}
+
 // SystemStruct : Beinhaltet alle Systeminformationen
 type SystemStruct struct {
 	Addresses struct {
@@ -82,13 +91,7 @@ type SystemStruct struct {
 
 	Notification map[string]Notification
 
-	ServerProtocol struct {
-		API string
-		DVR string
-		M3U string
-		WEB string
-		XML string
-	}
+	ServerProtocol ServerProtocolStruct
 
 	GitHub struct {
 		Branch  string

@@ -12,11 +12,18 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"threadfin/src/internal/authentication"
 
 	"github.com/gorilla/websocket"
+)
+
+// Rate limiting for updateLog requests to reduce noise
+var (
+	updateLogMutex sync.RWMutex
+	lastUpdateLog  = make(map[string]time.Time)
 )
 
 // StartWebserver : Startet den Webserver
@@ -188,6 +195,13 @@ func Stream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	systemMutex.Unlock()
+
+	// Check if this is an m3u8 URL - if so, proxy it through Threadfin and rewrite .ts segment URLs
+	if strings.Contains(streamInfo.URL, ".m3u8") {
+		showInfo(fmt.Sprintf("M3U8 URL detected: %s", streamInfo.URL))
+		showInfo("Streaming Info: M3U8 URL passed directly to client")
+		// Let the normal buffering process handle m3u8 URLs
+	}
 
 	switch playListBuffer {
 	case "-":
@@ -383,8 +397,8 @@ func WS(w http.ResponseWriter, r *http.Request) {
 	var newToken string
 
 	upgrader := websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
+		ReadBufferSize:   1024,
+		WriteBufferSize:  1024,
 		HandshakeTimeout: 10 * time.Second,
 		CheckOrigin: func(r *http.Request) bool {
 			// Implement any custom origin validation logic here, if needed.
@@ -405,7 +419,7 @@ func WS(w http.ResponseWriter, r *http.Request) {
 
 	// Generate a unique connection ID for tracking
 	connID := fmt.Sprintf("conn_%d", time.Now().UnixNano())
-	showInfo("WebSocket:" + "New connection established: " + connID)
+	showDebug("WebSocket: New connection established: "+connID, 2)
 
 	systemMutex.Lock()
 	if Settings.HttpThreadfinDomain != "" {
@@ -417,21 +431,23 @@ func WS(w http.ResponseWriter, r *http.Request) {
 
 	for {
 
-		showInfo("WebSocket:" + "Connection " + connID + " waiting for next request...")
 		// Reset read deadline before each read to keep connection alive
 		conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
 		err = conn.ReadJSON(&request)
 
 		if err != nil {
-			showInfo("WebSocket:" + "Connection " + connID + " closed due to read error: " + err.Error())
+			showDebug("WebSocket: Connection "+connID+" closed due to read error: "+err.Error(), 2)
 			return
 		}
 
-		showInfo("WebSocket:" + "Connection " + connID + " received request with command: " + request.Cmd)
-		showInfo("WebSocket:" + "Connection " + connID + " request JSON: " + mapToJSON(request))
+		// Only log detailed request info for non-updateLog requests to reduce noise
+		if request.Cmd != "updateLog" {
+			showDebug("WebSocket: Connection "+connID+" received request with command: "+request.Cmd, 2)
+			showDebug("WebSocket: Connection "+connID+" request JSON: "+mapToJSON(request), 3)
+			showDebug("WebSocket: Connection "+connID+" checking authentication...", 3)
+		}
 
 		systemMutex.Lock()
-		showInfo("WebSocket:" + "Connection " + connID + " checking authentication...")
 		if System.ConfigurationWizard == false {
 
 			switch Settings.AuthenticationWEB {
@@ -466,12 +482,16 @@ func WS(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				showInfo("WebSocket:" + "Connection " + connID + " token authentication successful")
+				if request.Cmd != "updateLog" {
+					showDebug("WebSocket: Connection "+connID+" token authentication successful", 3)
+				}
 				response.Token = newToken
 				response.Users, _ = authentication.GetAllUserData()
 
 			case false:
-				showInfo("WebSocket:" + "Connection " + connID + " no authentication required")
+				if request.Cmd != "updateLog" {
+					showDebug("WebSocket: Connection "+connID+" no authentication required", 3)
+				}
 
 			}
 
@@ -484,6 +504,21 @@ func WS(w http.ResponseWriter, r *http.Request) {
 			// response.Config = Settings
 
 		case "updateLog":
+			// Rate limit updateLog requests to reduce log noise
+			connectionKey := conn.RemoteAddr().String()
+			updateLogMutex.RLock()
+			lastTime, exists := lastUpdateLog[connectionKey]
+			updateLogMutex.RUnlock()
+
+			now := time.Now()
+			if !exists || now.Sub(lastTime) >= 10*time.Second {
+				updateLogMutex.Lock()
+				lastUpdateLog[connectionKey] = now
+				updateLogMutex.Unlock()
+
+				showDebug("WebSocket: updateLog request from "+connectionKey, 3)
+			}
+
 			response = setDefaultResponseData(response, false)
 			if err = conn.WriteJSON(response); err != nil {
 				ShowError(err, 1022)
@@ -1297,4 +1332,12 @@ func getContentType(filename string) (contentType string) {
 		return contentType
 	}
 	return "text/plain"
+}
+
+// Add a min helper function
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

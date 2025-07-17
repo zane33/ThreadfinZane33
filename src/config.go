@@ -55,24 +55,28 @@ func Init() (err error) {
 	System.AppName = strings.ToLower(System.Name)
 	System.ARCH = runtime.GOARCH
 	System.OS = runtime.GOOS
-	System.ServerProtocol.API = "http"
-	System.ServerProtocol.DVR = "http"
-	System.ServerProtocol.M3U = "http"
-	System.ServerProtocol.WEB = "http"
-	System.ServerProtocol.XML = "http"
+
+	// Initialize server protocols with default values
+	System.ServerProtocol = ServerProtocolStruct{
+		API: "http",
+		DVR: "http",
+		M3U: "http",
+		WEB: "http",
+		XML: "http",
+	}
+
 	System.PlexChannelLimit = 480
 	System.UnfilteredChannelLimit = 480
 	System.Compatibility = "0.1.0"
 
 	// FFmpeg Default Einstellungen
-	System.FFmpeg.DefaultOptions = "-hide_banner -loglevel error -analyzeduration 1000000 -probesize 1000000 -i [URL] -map 0:v -map 0:a:0 -c:v copy -c:a aac -b:a 192k -ac 2 -c:s copy -f mpegts -fflags +genpts -movflags +faststart -copyts pipe:1"
+	System.FFmpeg.DefaultOptions = "-hide_banner -loglevel error -analyzeduration 1000000 -probesize 1000000 -protocol_whitelist file,http,https,tcp,tls,crypto -timeout 30000000 -i [URL] -map 0:v -map 0:a:0 -c:v copy -c:a aac -b:a 192k -ac 2 -c:s copy -f mpegts -fflags +genpts -movflags +faststart -copyts pipe:1"
 	System.VLC.DefaultOptions = "-I dummy [URL] --sout #std{mux=ts,access=file,dst=-}"
 
-	// Default Logeinträge, wird später von denen aus der settings.json überschrieben. Muss gemacht werden, damit die ersten Einträge auch im Log (webUI aangezeigt werden)
+	// Default Logeinträge, wird später von denen aus der settings.json überschrieben
 	Settings.LogEntriesRAM = 500
 
 	// Variablen für den Update Prozess
-	//System.Update.Git = "https://github.com/Threadfin/Threadfin/blob"
 	System.Update.Git = fmt.Sprintf("https://github.com/%s/%s", System.GitHub.User, System.GitHub.Repo)
 	System.Update.Github = fmt.Sprintf("https://api.github.com/repos/%s/%s", System.GitHub.User, System.GitHub.Repo)
 	System.Update.Name = "Threadfin"
@@ -169,6 +173,17 @@ func Init() (err error) {
 		return
 	}
 
+	// Set initial domain based on settings
+	if Settings.HttpThreadfinDomain != "" {
+		setGlobalDomain(getBaseUrl(Settings.HttpThreadfinDomain, Settings.Port))
+	} else {
+		// Default to localhost if no domain is set
+		setGlobalDomain(fmt.Sprintf("localhost:%s", Settings.Port))
+	}
+
+	showInfo(fmt.Sprintf("Initial domain set to: %s", System.Domain))
+	showInfo(fmt.Sprintf("XML URL: %s", System.Addresses.XML))
+
 	// Berechtigung aller Ordner überprüfen
 	err = checkFilePermission(System.Folder.Config)
 	if err == nil {
@@ -176,7 +191,7 @@ func Init() (err error) {
 	}
 
 	// Separaten tmp Ordner für jede Instanz
-	//System.Folder.Temp = System.Folder.Temp + Settings.UUID + string(os.PathSeparator)
+	System.Folder.Temp = System.Folder.Temp + Settings.UUID + string(os.PathSeparator)
 	showInfo(fmt.Sprintf("Temporary Folder:%s", getPlatformPath(System.Folder.Temp)))
 
 	err = checkFolder(System.Folder.Temp)
@@ -203,7 +218,7 @@ func Init() (err error) {
 	showInfo(fmt.Sprintf("GitHub:https://github.com/%s", System.GitHub.User))
 	showInfo(fmt.Sprintf("Git Branch:%s [%s]", System.Branch, System.GitHub.User))
 
-	// Set base URI
+	// Update domain with final settings
 	if Settings.HttpThreadfinDomain != "" {
 		setGlobalDomain(getBaseUrl(Settings.HttpThreadfinDomain, Settings.Port))
 	} else {

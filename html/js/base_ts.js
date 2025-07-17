@@ -4,7 +4,7 @@ var COLUMN_TO_SORT;
 var INACTIVE_COLUMN_TO_SORT;
 var SEARCH_MAPPING = new Object();
 var UNDO = new Object();
-// SERVER_CONNECTION removed - now supports multiple concurrent requests
+var SERVER_CONNECTION = false;
 var WS_AVAILABLE = false;
 const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
 const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
@@ -276,6 +276,11 @@ function sortTable(column, table_name = "content_table") {
 }
 function createSearchObj() {
     SEARCH_MAPPING = new Object();
+    // Safety check to ensure SERVER data is loaded
+    if (!SERVER || !SERVER["xepg"] || !SERVER["xepg"]["epgMapping"]) {
+        console.log("DEBUG: SERVER data not ready yet, skipping search object creation");
+        return;
+    }
     var data = SERVER["xepg"]["epgMapping"];
     var channels = getObjKeys(data);
     var channelKeys = ["x-active", "x-channelID", "x-name", "_file.m3u.name", "x-group-title", "x-xmltv-file"];
@@ -539,13 +544,21 @@ function probeChannel(url) {
     return;
 }
 function checkUndo(key) {
+    if (!SERVER || !SERVER["xepg"]) {
+        console.warn("Server or xepg data not initialized yet");
+        return;
+    }
+
     switch (key) {
         case "epgMapping":
             if (UNDO.hasOwnProperty(key)) {
-                SERVER["xepg"][key] = JSON.parse(JSON.stringify(UNDO[key]));
-            }
-            else {
-                UNDO[key] = JSON.parse(JSON.stringify(SERVER["xepg"][key]));
+                if (SERVER["xepg"][key] !== undefined) {
+                    SERVER["xepg"][key] = JSON.parse(JSON.stringify(UNDO[key]));
+                }
+            } else {
+                if (SERVER["xepg"][key] !== undefined) {
+                    UNDO[key] = JSON.parse(JSON.stringify(SERVER["xepg"][key]));
+                }
             }
             break;
         default:
@@ -574,46 +587,4 @@ function updateLog() {
     console.log("TOKEN");
     var server = new Server("updateLog");
     server.request(new Object());
-}
-
-function showNotification(message, type, duration) {
-    // Remove existing notifications
-    var existingNotification = document.querySelector('.error-notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
-
-    // Create notification element
-    var notification = document.createElement('div');
-    notification.className = 'error-notification';
-    
-    // Add type class (error, warning, info, success)
-    if (type) {
-        notification.classList.add(type);
-    }
-
-    // Add close button
-    var closeBtn = document.createElement('button');
-    closeBtn.className = 'close-btn';
-    closeBtn.innerHTML = '×';
-    closeBtn.onclick = function() {
-        notification.remove();
-    };
-
-    // Add message
-    var messageText = document.createElement('div');
-    messageText.innerHTML = message;
-
-    notification.appendChild(closeBtn);
-    notification.appendChild(messageText);
-    
-    // Add to document
-    document.body.appendChild(notification);
-
-    // Auto-remove after duration (default 8 seconds)
-    setTimeout(function() {
-        if (notification.parentNode) {
-            notification.remove();
-        }
-    }, duration || 8000);
 }
