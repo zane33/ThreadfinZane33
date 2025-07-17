@@ -12,8 +12,12 @@ services:
     container_name: threadfin
     restart: unless-stopped
     
+    # Use host network mode - this allows the container to bind to host IP addresses
+    network_mode: host
+    
+    # Note: ports mapping is not needed with host networking
     ports:
-      - "34400:34400"
+       - "34400:34400"
     
     volumes:
       - threadfin_conf:/home/threadfin/conf
