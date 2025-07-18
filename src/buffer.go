@@ -1365,11 +1365,11 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 			select {
 			case timeout := <-t:
 				// Increased timeout for M3U8 streams - they can take longer to establish
-				var timeoutLimit int64 = 60
+				var timeoutLimit int = 60
 				if strings.Contains(url, ".m3u8") {
 					timeoutLimit = 90 // Give M3U8 streams more time to initialize
 				}
-				if timeout >= timeoutLimit && tmpSegment == 1 {
+				if int(timeout) >= timeoutLimit && tmpSegment == 1 {
 					cmd.Process.Kill()
 					err = errors.New(fmt.Sprintf("Stream initialization timeout after %d seconds", timeoutLimit))
 					ShowError(err, 4006)
