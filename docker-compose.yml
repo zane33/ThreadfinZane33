@@ -32,7 +32,7 @@ services:
       - THREADFIN_BIND_IP_ADDRESS=0.0.0.0
       - THREADFIN_DEBUG=0
       - THREADFIN_BRANCH=main
-      - THREADFIN_DOMAIN=192.168.4.69:34400
+      - THREADFIN_DOMAIN=192.168.4.5:34400
       - TZ=Pacific/Auckland # Set your timezone
     
     # DNS configuration to resolve external hostnames
