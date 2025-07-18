@@ -404,6 +404,12 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 		}
 	}
 
+	// For M3U8 streams, wait a bit to ensure proper initialization
+	if strings.Contains(streamingURL, ".m3u8") {
+		showInfo("Waiting for M3U8 stream initialization before sending response")
+		time.Sleep(time.Duration(1000) * time.Millisecond) // Wait 1 second for M3U8 stream to stabilize
+	}
+
 	w.WriteHeader(200)
 
 	for { //Loop 1: Wait until the first segment has been downloaded through the buffer
@@ -1131,8 +1137,8 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 			// Optimize ffmpeg options for M3U8/HLS streams
 			if strings.Contains(url, ".m3u8") {
 				showInfo("Optimizing ffmpeg options for M3U8/HLS stream")
-				// Enhanced options for M3U8 streams to ensure reliable MPEG-TS output for Plex
-				options = "-hide_banner -loglevel error -analyzeduration 2000000 -probesize 2000000 -protocol_whitelist file,http,https,tcp,tls,crypto -timeout 30000000 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2 -i [URL] -map 0:v -map 0:a:0 -c:v copy -c:a aac -b:a 192k -ac 2 -f mpegts -fflags +genpts +discardcorrupt -movflags +faststart -copyts -muxrate 5000k pipe:1"
+				// Ultra-simple options for M3U8 streams - minimal processing for maximum compatibility
+				options = "-hide_banner -loglevel error -fflags +genpts -i [URL] -c copy -f mpegts pipe:1"
 			}
 
 		case "vlc":
@@ -1359,9 +1365,13 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 			select {
 			case timeout := <-t:
 				// Increased timeout for M3U8 streams - they can take longer to establish
-				if timeout >= 60 && tmpSegment == 1 {
+				var timeoutLimit int64 = 60
+				if strings.Contains(url, ".m3u8") {
+					timeoutLimit = 90 // Give M3U8 streams more time to initialize
+				}
+				if timeout >= timeoutLimit && tmpSegment == 1 {
 					cmd.Process.Kill()
-					err = errors.New("Stream initialization timeout after 60 seconds")
+					err = errors.New(fmt.Sprintf("Stream initialization timeout after %d seconds", timeoutLimit))
 					ShowError(err, 4006)
 					killClientConnection(streamID, playlistID, false)
 					addErrorToStream(err)
