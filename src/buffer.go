@@ -1127,6 +1127,13 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 
 			path = Settings.FFmpegPath
 			options = Settings.FFmpegOptions
+			
+			// Optimize ffmpeg options for M3U8/HLS streams
+			if strings.Contains(url, ".m3u8") {
+				showInfo("Optimizing ffmpeg options for M3U8/HLS stream")
+				// Enhanced options for M3U8 streams to ensure reliable MPEG-TS output for Plex
+				options = "-hide_banner -loglevel error -analyzeduration 2000000 -probesize 2000000 -protocol_whitelist file,http,https,tcp,tls,crypto -timeout 30000000 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2 -i [URL] -map 0:v -map 0:a:0 -c:v copy -c:a aac -b:a 192k -ac 2 -f mpegts -fflags +genpts +discardcorrupt -movflags +faststart -copyts -muxrate 5000k pipe:1"
+			}
 
 		case "vlc":
 			path = Settings.VLCPath

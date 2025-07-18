@@ -138,6 +138,9 @@ func Stream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "video/mp2t")
 	w.Header().Set("Accept-Ranges", "bytes")
 	w.Header().Set("Transfer-Encoding", "chunked")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Pragma", "no-cache")
 
 	// If an UDPxy host is set, and the stream URL is multicast (i.e. starts with 'udp://@'),
 	// then streamInfo.URL needs to be rewritten to point to UDPxy.
@@ -184,11 +187,16 @@ func Stream(w http.ResponseWriter, r *http.Request) {
 	}
 	systemMutex.Unlock()
 
-	// Check if this is an m3u8 URL - if so, proxy it through Threadfin and rewrite .ts segment URLs
-	if strings.Contains(streamInfo.URL, ".m3u8") {
+	// Check if this is an m3u8 URL - force buffering for Plex Live TV compatibility
+	var isM3U8Stream = strings.Contains(streamInfo.URL, ".m3u8")
+	if isM3U8Stream {
 		showInfo(fmt.Sprintf("M3U8 URL detected: %s", streamInfo.URL))
-		showInfo("Streaming Info: M3U8 URL passed directly to client")
-		// Let the normal buffering process handle m3u8 URLs
+		showInfo("Streaming Info: M3U8 stream will be transcoded for Plex compatibility")
+		// Force ffmpeg buffering for M3U8 streams to ensure MPEG-TS output for Plex
+		if playListBuffer == "-" {
+			playListBuffer = "ffmpeg"
+			showInfo("Streaming Info: Forcing ffmpeg buffer for M3U8 stream")
+		}
 	}
 
 	switch playListBuffer {
@@ -209,6 +217,13 @@ func Stream(w http.ResponseWriter, r *http.Request) {
 
 	showInfo(fmt.Sprintf("Channel Name:%s", streamInfo.Name))
 	showInfo(fmt.Sprintf("Client User-Agent:%s", r.Header.Get("User-Agent")))
+	
+	// Detect Plex client for additional compatibility handling
+	userAgent := r.Header.Get("User-Agent")
+	isPlexClient := strings.Contains(strings.ToLower(userAgent), "plex") || strings.Contains(strings.ToLower(userAgent), "lavf")
+	if isPlexClient && isM3U8Stream {
+		showInfo("Streaming Info: Plex client detected with M3U8 stream - ensuring MPEG-TS transcoding")
+	}
 
 	switch playListBuffer {
 	case "-":
