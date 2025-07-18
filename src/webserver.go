@@ -134,6 +134,11 @@ func Stream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set headers for better Plex compatibility
+	w.Header().Set("Content-Type", "video/mp2t")
+	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("Transfer-Encoding", "chunked")
+
 	// If an UDPxy host is set, and the stream URL is multicast (i.e. starts with 'udp://@'),
 	// then streamInfo.URL needs to be rewritten to point to UDPxy.
 	if Settings.UDPxy != "" && strings.HasPrefix(streamInfo.URL, "udp://@") {
@@ -157,26 +162,9 @@ func Stream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "HEAD" {
-		client := &http.Client{}
-		req, err := http.NewRequest("HEAD", streamInfo.URL, nil)
-		if err != nil {
-			ShowError(err, 1501)
-			httpStatusError(w, r, 405)
-			return
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			ShowError(err, 1502)
-			httpStatusError(w, r, 405)
-			return
-		}
-		defer resp.Body.Close()
-		// Copy headers from the source HEAD response to the outgoing response
-		for key, values := range resp.Header {
-			for _, value := range values {
-				w.Header().Add(key, value)
-			}
-		}
+		w.Header().Set("Content-Type", "video/mp2t")
+		w.Header().Set("Accept-Ranges", "bytes")
+		w.WriteHeader(200)
 		return
 	}
 

@@ -3,6 +3,7 @@ package src
 import (
   "fmt"
   "log"
+  "net"
   "os"
   "os/signal"
   "time"
@@ -26,7 +27,7 @@ func SSDP() (err error) {
     fmt.Sprintf("upnp:rootdevice"),                           // send as "ST"
     fmt.Sprintf("uuid:%s::upnp:rootdevice", System.DeviceID), // send as "USN"
     fmt.Sprintf("%s/device.xml", System.URLBase),             // send as "LOCATION"
-    System.AppName, // send as "SERVER"
+    fmt.Sprintf("Linux/3.14 UPnP/1.0 %s/%s", System.Name, System.Version), // send as "SERVER"
     1800)           // send as "maxAge" in "CACHE-CONTROL"
 
   if err != nil {
@@ -69,4 +70,45 @@ func SSDP() (err error) {
   }(ad)
 
   return
+}
+
+// startUDPDiscovery starts UDP discovery service on port 65001 for HDHomeRun compatibility
+func startUDPDiscovery() {
+  go func() {
+    addr, err := net.ResolveUDPAddr("udp", ":65001")
+    if err != nil {
+      ShowError(err, 0)
+      return
+    }
+
+    conn, err := net.ListenUDP("udp", addr)
+    if err != nil {
+      ShowError(err, 0)
+      return
+    }
+    defer conn.Close()
+
+    showInfo("UDP Discovery service started on port 65001")
+
+    for {
+      buffer := make([]byte, 1024)
+      n, clientAddr, err := conn.ReadFromUDP(buffer)
+      if err != nil {
+        ShowError(err, 0)
+        continue
+      }
+
+      request := string(buffer[:n])
+      
+      // HDHomeRun discovery protocol - must match exact format
+      if request == "getmyaddr" {
+        response := fmt.Sprintf("getmyaddr\n%s\n", clientAddr.IP.String())
+        conn.WriteToUDP([]byte(response), clientAddr)
+      } else if request == "discover" {
+        // HDHomeRun discovery response format
+        response := fmt.Sprintf("discover\n%s %s\n", System.DeviceID, System.URLBase)
+        conn.WriteToUDP([]byte(response), clientAddr)
+      }
+    }
+  }()
 }

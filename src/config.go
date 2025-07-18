@@ -173,13 +173,18 @@ func Init() (err error) {
 		return
 	}
 
-	// Set initial domain based on settings
-	if Settings.HttpThreadfinDomain != "" {
-		setGlobalDomain(getBaseUrl(Settings.HttpThreadfinDomain, Settings.Port))
+	// Set initial domain based on settings or environment variable
+	var domain string
+	if envDomain := os.Getenv("THREADFIN_DOMAIN"); envDomain != "" {
+		domain = envDomain
+		showInfo(fmt.Sprintf("Using domain from environment variable: %s", domain))
+	} else if Settings.HttpThreadfinDomain != "" {
+		domain = getBaseUrl(Settings.HttpThreadfinDomain, Settings.Port)
 	} else {
 		// Default to localhost if no domain is set
-		setGlobalDomain(fmt.Sprintf("localhost:%s", Settings.Port))
+		domain = fmt.Sprintf("localhost:%s", Settings.Port)
 	}
+	setGlobalDomain(domain)
 
 	showInfo(fmt.Sprintf("Initial domain set to: %s", System.Domain))
 	showInfo(fmt.Sprintf("XML URL: %s", System.Addresses.XML))
@@ -219,7 +224,10 @@ func Init() (err error) {
 	showInfo(fmt.Sprintf("Git Branch:%s [%s]", System.Branch, System.GitHub.User))
 
 	// Update domain with final settings
-	if Settings.HttpThreadfinDomain != "" {
+	if envDomain := os.Getenv("THREADFIN_DOMAIN"); envDomain != "" {
+		setGlobalDomain(envDomain)
+		showInfo(fmt.Sprintf("Final domain set from environment variable: %s", envDomain))
+	} else if Settings.HttpThreadfinDomain != "" {
 		setGlobalDomain(getBaseUrl(Settings.HttpThreadfinDomain, Settings.Port))
 	} else {
 		setGlobalDomain(fmt.Sprintf("%s:%s", System.IPAddress, Settings.Port))
@@ -244,6 +252,8 @@ func Init() (err error) {
 		if err != nil {
 			return
 		}
+		// Start UDP discovery for HDHomeRun compatibility
+		startUDPDiscovery()
 	}
 
 	// HTML Datein laden

@@ -158,6 +158,9 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Pragma", "no-cache")
+	// Additional headers for Plex compatibility
+	w.Header().Set("Content-Type", "video/mp2t")
+	w.Header().Set("Accept-Ranges", "bytes")
 
 	// Check whether the playlist is already in use
 	Lock.Lock()

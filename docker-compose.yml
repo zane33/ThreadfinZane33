@@ -12,12 +12,14 @@ services:
     container_name: threadfin
     restart: unless-stopped
     
-    # Use host network mode - this allows the container to bind to host IP addresses
+    # Use host network mode for better SSDP/UPnP compatibility
     network_mode: host
     
-    # Note: ports mapping is not needed with host networking
-    ports:
-       - "34400:34400"
+    # Port mapping for bridge networking (disabled when using host mode)
+    #ports:
+    #  - "34400:34400"           # HTTP API and streaming
+    #  - "1900:1900/udp"         # SSDP/UPnP discovery (mapped to avoid conflicts)
+        #- "65002:65001/udp"       # HDHomeRun UDP discovery
     
     volumes:
       - threadfin_conf:/home/threadfin/conf
@@ -30,6 +32,7 @@ services:
       - THREADFIN_BIND_IP_ADDRESS=0.0.0.0
       - THREADFIN_DEBUG=0
       - THREADFIN_BRANCH=main
+      - THREADFIN_DOMAIN=192.168.4.69:34400
       - TZ=Pacific/Auckland # Set your timezone
     
     # DNS configuration to resolve external hostnames

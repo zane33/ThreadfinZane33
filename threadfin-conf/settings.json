@@ -9,11 +9,11 @@
   "backup.path": "/home/threadfin/conf/backup/",
   "git.branch": "MAIN",
   "buffer": "ffmpeg",
-  "buffer.size.kb": 4096,
+  "buffer.size.kb": 8192,
   "buffer.timeout": 2000,
   "cache.images": false,
   "epgSource": "XEPG",
-  "ffmpeg.options": "-hide_banner -loglevel error -analyzeduration 1000000 -probesize 1000000 -i [URL] -map 0:v -map 0:a:0 -c:v copy -c:a aac -b:a 192k -ac 2 -c:s copy -f mpegts -fflags +genpts -movflags +faststart -copyts pipe:1",
+  "ffmpeg.options": "-hide_banner -loglevel error -analyzeduration 3000000 -probesize 3000000 -fflags +genpts -i [URL] -map 0:v -map 0:a:0? -c:v copy -c:a aac -b:a 192k -ac 2 -f mpegts -mpegts_m2ts_mode 1 -muxdelay 0 -muxpreload 0 -copyts pipe:1",
   "ffmpeg.path": "ffmpeg",
   "ffmpeg.forceHttp": true,
   "vlc.options": "-I dummy [URL] --sout #std{mux=ts,access=file,dst=-}",
@@ -32,7 +32,7 @@
   "port": "34400",
   "ssdp": true,
   "temp.path": "/tmp/threadfin/",
-  "tuner": 1,
+  "tuner": 6,
   "update": [
     "0000"
   ],

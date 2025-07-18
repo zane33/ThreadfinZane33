@@ -47,11 +47,7 @@ type LineupStatus struct {
 }
 
 // Lineup : HDHR Lineup /lineup.json
-type Lineup []interface {
-	//GuideName string `json:"GuideName"`
-	//GuideNumber string `json:"GuideNumber"`
-	//URL         string `json:"URL"`
-}
+type Lineup []LineupStream
 
 // LineupStream : HDHR einzelner Stream im Lineup
 type LineupStream struct {

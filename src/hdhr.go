@@ -50,9 +50,9 @@ func getCapability() (xmlContent []byte, err error) {
 	capability.Device.DeviceType = "urn:schemas-upnp-org:device:MediaServer:1"
 	capability.Device.FriendlyName = System.Name
 	capability.Device.Manufacturer = "Silicondust"
-	capability.Device.ModelName = "HDTC-2US"
-	capability.Device.ModelNumber = "HDTC-2US"
-	capability.Device.SerialNumber = ""
+	capability.Device.ModelName = "HDHomeRun CONNECT"
+	capability.Device.ModelNumber = "HDHR4-2US"
+	capability.Device.SerialNumber = System.DeviceID
 	capability.Device.UDN = "uuid:" + System.DeviceID
 
 	output, err := xml.MarshalIndent(capability, " ", "  ")
@@ -79,8 +79,8 @@ func getDiscover() (jsonContent []byte, err error) {
 	discover.FriendlyName = System.Name
 
 	discover.LineupURL = fmt.Sprintf("%s://%s/lineup.json", System.ServerProtocol.DVR, System.Domain)
-	discover.Manufacturer = "Golang"
-	discover.ModelNumber = System.Version
+	discover.Manufacturer = "Silicondust"
+	discover.ModelNumber = "HDHR4-2US"
 	discover.TunerCount = Settings.Tuner
 
 	jsonContent, err = json.MarshalIndent(discover, "", "  ")

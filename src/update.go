@@ -60,6 +60,12 @@ func BinaryUpdate() (err error) {
 			return err
 		}
 
+		// Check if we have any releases data
+		if len(git) == 0 {
+			showInfo("No releases found on GitHub")
+			return nil
+		}
+
 		// Get latest prerelease tag name
 		if System.Branch == "Beta" {
 			for _, release := range git {
@@ -130,9 +136,22 @@ func BinaryUpdate() (err error) {
 	}
 
 	var currentVersion = System.Version + "." + System.Build
+	
+	// Check if current version is valid
+	if System.Version == "" || System.Build == "" {
+		showInfo("System version or build is empty, skipping update check")
+		return nil
+	}
+	
 	current_version, err := version.NewVersion(currentVersion)
 	if err != nil {
 		showInfo(fmt.Sprintf("Invalid current version format: %s", currentVersion))
+		return nil
+	}
+	
+	// Check if response version is empty before parsing
+	if updater.Response.Version == "" {
+		showInfo("No response version available, skipping update check")
 		return nil
 	}
 	
