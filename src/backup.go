@@ -219,10 +219,13 @@ func ThreadfinRestoreFromWeb(input string) (newWebURL string, err error) {
 
 	var archive = System.Folder.Temp + "restore.zip"
 
+	showDebug(fmt.Sprintf("Writing backup archive to: %s", archive), 1)
 	err = writeByteToFile(archive, sDec)
 	if err != nil {
+		showDebug(fmt.Sprintf("Failed to write backup archive: %s", err.Error()), 1)
 		return
 	}
+	showDebug("Backup archive written successfully", 1)
 
 	newWebURL, err = ThreadfinRestore(archive)
 
