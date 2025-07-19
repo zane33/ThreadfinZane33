@@ -1138,8 +1138,10 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 			// Optimize ffmpeg options for M3U8/HLS streams
 			if strings.Contains(url, ".m3u8") {
 				showInfo("Optimizing ffmpeg options for M3U8/HLS stream")
+				showInfo("HLS Stream URL: " + url)
 				// Enhanced HLS-specific options for reliable MPEG-TS output for Plex
-				options = "-hide_banner -loglevel warning -fflags +genpts -re -i [URL] -c:v copy -c:a copy -f mpegts -muxrate 10000k -mpegts_m2ts_mode 0 -mpegts_original_network_id 0x1 -mpegts_transport_stream_id 0x1 -mpegts_service_id 0x1 -mpegts_pmt_start_pid 0x1000 -mpegts_start_pid 0x100 pipe:1"
+				options = "-hide_banner -loglevel warning -fflags +genpts -allowed_extensions ALL -protocol_whitelist file,http,https,tcp,tls,crypto -i [URL] -c:v copy -c:a copy -f mpegts -muxrate 10000k -mpegts_m2ts_mode 0 -mpegts_original_network_id 0x1 -mpegts_transport_stream_id 0x1 -mpegts_service_id 0x1 -mpegts_pmt_start_pid 0x1000 -mpegts_start_pid 0x100 -avoid_negative_ts make_zero pipe:1"
+				showInfo("Applied optimized HLS ffmpeg options")
 			}
 
 		case "vlc":
