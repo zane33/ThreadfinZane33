@@ -404,10 +404,11 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 		}
 	}
 
-	// For M3U8 streams, wait a bit to ensure proper initialization
+	// For M3U8 streams, ensure proper header setup without delay
 	if strings.Contains(streamingURL, ".m3u8") {
-		showInfo("Waiting for M3U8 stream initialization before sending response")
-		time.Sleep(time.Duration(1000) * time.Millisecond) // Wait 1 second for M3U8 stream to stabilize
+		showInfo("M3U8 stream detected - optimizing headers for Plex compatibility")
+		w.Header().Set("Content-Type", "video/mp2t")
+		w.Header().Set("Transfer-Encoding", "chunked")
 	}
 
 	w.WriteHeader(200)
@@ -1137,8 +1138,8 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 			// Optimize ffmpeg options for M3U8/HLS streams
 			if strings.Contains(url, ".m3u8") {
 				showInfo("Optimizing ffmpeg options for M3U8/HLS stream")
-				// Ultra-simple options for M3U8 streams - minimal processing for maximum compatibility
-				options = "-hide_banner -loglevel error -fflags +genpts -i [URL] -c copy -f mpegts pipe:1"
+				// Enhanced HLS-specific options for reliable MPEG-TS output for Plex
+				options = "-hide_banner -loglevel warning -fflags +genpts -re -i [URL] -c:v copy -c:a copy -f mpegts -muxrate 10000k -mpegts_m2ts_mode 0 -mpegts_original_network_id 0x1 -mpegts_transport_stream_id 0x1 -mpegts_service_id 0x1 -mpegts_pmt_start_pid 0x1000 -mpegts_start_pid 0x100 pipe:1"
 			}
 
 		case "vlc":
