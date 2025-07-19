@@ -145,22 +145,13 @@ func GetUserHomeDirectory() (userHomeDirectory string) {
 func checkFilePermission(dir string) (err error) {
 
 	var filename = dir + "permission.test"
-	
-	showDebug(fmt.Sprintf("Checking file permissions for directory: %s", dir), 2)
+
 	err = os.WriteFile(filename, []byte(""), 0644)
-	if err != nil {
-		showDebug(fmt.Sprintf("Permission check failed - cannot write to: %s - Error: %s", dir, err.Error()), 1)
-		return err
+	if err == nil {
+		err = os.RemoveAll(filename)
 	}
-	
-	err = os.RemoveAll(filename)
-	if err != nil {
-		showDebug(fmt.Sprintf("Permission check failed - cannot delete from: %s - Error: %s", dir, err.Error()), 1)
-		return err
-	}
-	
-	showDebug(fmt.Sprintf("Permission check passed for: %s", dir), 2)
-	return nil
+
+	return
 }
 
 // Ordnerpfad für das laufende OS generieren
@@ -276,43 +267,31 @@ func saveMapToJSONFile(file string, tmpMap interface{}) error {
 	jsonString, err := json.MarshalIndent(tmpMap, "", "  ")
 
 	if err != nil {
-		showDebug(fmt.Sprintf("JSON Marshal Error: %s", err.Error()), 1)
 		return err
 	}
 
+	os.Create(filename)
 	err = os.WriteFile(filename, []byte(jsonString), 0644)
 	if err != nil {
-		showDebug(fmt.Sprintf("Write File Error: %s - %s", filename, err.Error()), 1)
 		return err
 	}
 
-	showDebug(fmt.Sprintf("Successfully saved: %s", filename), 2)
 	return nil
 }
 
 func loadJSONFileToMap(file string) (tmpMap map[string]interface{}, err error) {
-	filename := getPlatformFile(file)
-	f, err := os.Open(filename)
-	if err != nil {
-		showDebug(fmt.Sprintf("Open File Error: %s - %s", filename, err.Error()), 1)
-		return nil, err
-	}
+	f, err := os.Open(getPlatformFile(file))
 	defer f.Close()
 
 	content, err := io.ReadAll(f)
-	if err != nil {
-		showDebug(fmt.Sprintf("Read File Error: %s - %s", filename, err.Error()), 1)
-		return nil, err
+
+	if err == nil {
+		err = json.Unmarshal([]byte(content), &tmpMap)
 	}
 
-	err = json.Unmarshal(content, &tmpMap)
-	if err != nil {
-		showDebug(fmt.Sprintf("JSON Unmarshal Error: %s - %s", filename, err.Error()), 1)
-		return nil, err
-	}
+	f.Close()
 
-	showDebug(fmt.Sprintf("Successfully loaded: %s", filename), 2)
-	return tmpMap, nil
+	return
 }
 
 // Binary

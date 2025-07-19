@@ -252,14 +252,10 @@ func saveSettings(settings SettingsStruct) (err error) {
 
 	System.Folder.Temp = settings.TempPath + settings.UUID + string(os.PathSeparator)
 
-	settingsJSON := mapToJSON(settings)
-	showDebug(fmt.Sprintf("Saving settings to: %s", System.File.Settings), 1)
-	err = writeByteToFile(System.File.Settings, []byte(settingsJSON))
+	err = writeByteToFile(System.File.Settings, []byte(mapToJSON(settings)))
 	if err != nil {
-		showDebug(fmt.Sprintf("Failed to save settings: %s", err.Error()), 1)
 		return
 	}
-	showDebug("Settings saved successfully", 1)
 
 	Settings = settings
 
