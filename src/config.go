@@ -278,8 +278,16 @@ func StartSystem(updateProviderFiles bool) (err error) {
 	showInfo(fmt.Sprintf("Plex Channel Limit:%d", System.PlexChannelLimit))
 	showInfo(fmt.Sprintf("Unfiltered Chan. Limit:%d", System.UnfilteredChannelLimit))
 
+	// Check for environment variable to override FilesUpdate setting for faster startup
+	var filesUpdateOverride = os.Getenv("THREADFIN_FAST_STARTUP")
+	var shouldUpdateFiles = Settings.FilesUpdate
+	if filesUpdateOverride == "true" || filesUpdateOverride == "1" {
+		shouldUpdateFiles = false
+		showInfo("Fast Startup: Skipping provider file updates due to THREADFIN_FAST_STARTUP environment variable")
+	}
+
 	// Providerdaten aktualisieren
-	if len(Settings.Files.M3U) > 0 && Settings.FilesUpdate == true || updateProviderFiles == true {
+	if len(Settings.Files.M3U) > 0 && shouldUpdateFiles == true || updateProviderFiles == true {
 
 		err = ThreadfinAutoBackup()
 		if err != nil {

@@ -33,6 +33,7 @@ services:
       - THREADFIN_DEBUG=0
       - THREADFIN_BRANCH=main
       - THREADFIN_DOMAIN=192.168.4.5:34400
+      - THREADFIN_FAST_STARTUP=true  # Skip provider file updates for faster startup
       - TZ=Pacific/Auckland # Set your timezone
     
     # DNS configuration to resolve external hostnames

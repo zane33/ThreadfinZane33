@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,14 @@ import (
 func getProviderData(fileType, fileID string) (err error) {
 
 	showInfo("Provider:" + "getProviderData called with fileType=" + fileType + " fileID=" + fileID)
+	
+	// Check for fast startup environment variable
+	var fastStartup = os.Getenv("THREADFIN_FAST_STARTUP")
+	showInfo(fmt.Sprintf("Fast Startup Debug: ENV=%s, fileID='%s', fileType=%s", fastStartup, fileID, fileType))
+	if (fastStartup == "true" || fastStartup == "1") && fileID == "" {
+		showInfo("Fast Startup: Skipping provider data download for " + fileType + " due to THREADFIN_FAST_STARTUP environment variable")
+		return nil
+	}
 
 	var fileExtension, serverFileName string
 	var body = make([]byte, 0)
