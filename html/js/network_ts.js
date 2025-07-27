@@ -284,7 +284,10 @@ var Server = /** @class */ (function () {
         if (this.cmd !== "updateLog") {
             SERVER_CONNECTION = true;
             UNDO = new Object();
-            showElement("loading", true);
+            // Don't show loading for saveSettings - it's already handled by the calling function
+            if (!this.cmd.startsWith("save")) {
+                showElement("loading", true);
+            }
             console.log("DEBUG: Loading indicator shown for command:", this.cmd);
         }
         var protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
@@ -316,8 +319,10 @@ var Server = /** @class */ (function () {
         if (this.cmd !== "updateLog") {
             SERVER_CONNECTION = false;
             
-            // Force hide loading indicator with both methods to ensure it works
-            showElement("loading", false);
+            // Don't hide loading for saveSettings - let the WebSocket response handler do it
+            if (!this.cmd.startsWith("save")) {
+                showElement("loading", false);
+            }
             
             // Only log non-updateLog responses to reduce noise
             console.log("DEBUG: Response received for:", this.cmd);

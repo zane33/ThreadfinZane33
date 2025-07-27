@@ -78,14 +78,54 @@ function showElement(elmID, type) {
                 console.log("DEBUG: Hiding loading modal");
                 try {
                     var loadingElement = document.getElementById("loading");
-                    if (loadingElement.classList.contains('show')) {
-                        loadingModal.hide();
+                    console.log("DEBUG: Loading element classes:", loadingElement.className);
+                    console.log("DEBUG: Loading element style display:", loadingElement.style.display);
+                    
+                    // Try multiple methods to hide the modal
+                    var hidden = false;
+                    
+                    // Method 1: Use Bootstrap modal instance
+                    try {
+                        if (loadingModal && typeof loadingModal.hide === 'function') {
+                            loadingModal.hide();
+                            console.log("DEBUG: Called loadingModal.hide()");
+                            hidden = true;
+                        }
+                    } catch (e) {
+                        console.warn("DEBUG: loadingModal.hide() failed:", e);
                     }
                     
-                    // Force cleanup after a short delay
+                    // Method 2: Try to get fresh Bootstrap instance
+                    if (!hidden) {
+                        try {
+                            var modalInstance = bootstrap.Modal.getInstance(loadingElement);
+                            if (modalInstance) {
+                                modalInstance.hide();
+                                console.log("DEBUG: Called bootstrap.Modal.getInstance().hide()");
+                                hidden = true;
+                            }
+                        } catch (e) {
+                            console.warn("DEBUG: Bootstrap getInstance failed:", e);
+                        }
+                    }
+                    
+                    // Method 3: Force hide with direct DOM manipulation
+                    if (!hidden) {
+                        console.log("DEBUG: Force hiding modal with DOM manipulation");
+                        loadingElement.classList.remove('show');
+                        loadingElement.style.display = 'none';
+                        loadingElement.setAttribute('aria-hidden', 'true');
+                        loadingElement.removeAttribute('aria-modal');
+                        document.body.classList.remove('modal-open');
+                        document.body.style.overflow = '';
+                        document.body.style.paddingRight = '';
+                    }
+                    
+                    // Always cleanup after a short delay
                     setTimeout(function() {
                         // Remove modal backdrop elements
                         var backdrops = document.querySelectorAll('.modal-backdrop');
+                        console.log("DEBUG: Found", backdrops.length, "backdrop(s) to remove");
                         backdrops.forEach(function(backdrop) {
                             if (backdrop.parentNode) {
                                 backdrop.parentNode.removeChild(backdrop);
