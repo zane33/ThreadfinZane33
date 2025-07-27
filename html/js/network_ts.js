@@ -151,19 +151,68 @@ var WebSocketManager = /** @class */ (function () {
                 return;
             case "saveSettings":
                 // Handle settings save response with visual feedback
+                console.log("DEBUG: Processing saveSettings response", response);
+                
+                // Always hide loading indicator first
+                if (typeof showElement === 'function') {
+                    showElement("loading", false);
+                }
+                
                 if (response["status"] !== false) {
                     SERVER = response;
                     if (response.hasOwnProperty("settings")) {
                         createLayout();
                     }
+                    
                     // Show success notification
                     if (typeof showNotification === 'function') {
                         showNotification("Settings saved successfully!", "success", 3000);
                     }
+                    
                     // Clear all 'changed' classes to indicate save is complete
                     var changedElements = document.getElementsByClassName("changed");
                     for (var i = changedElements.length - 1; i >= 0; i--) {
                         changedElements[i].classList.remove("changed");
+                        // Also remove saving class if it exists
+                        changedElements[i].classList.remove("saving");
+                    }
+                    
+                    // Reset any save buttons that might be in saving state
+                    var saveButtons = document.querySelectorAll(".save-button.saving");
+                    for (var j = 0; j < saveButtons.length; j++) {
+                        var button = saveButtons[j];
+                        button.disabled = false;
+                        button.classList.remove("saving");
+                        var originalText = button.getAttribute("data-original-text");
+                        if (originalText) {
+                            button.value = originalText;
+                            button.removeAttribute("data-original-text");
+                        }
+                    }
+                } else {
+                    // Handle error case
+                    console.error("Settings save failed:", response);
+                    if (typeof showNotification === 'function') {
+                        var errorMsg = response.error || "Failed to save settings";
+                        showNotification("Error: " + errorMsg, "error", 5000);
+                    }
+                    
+                    // Reset saving states on error
+                    var savingElements = document.getElementsByClassName("saving");
+                    for (var k = savingElements.length - 1; k >= 0; k--) {
+                        savingElements[k].classList.remove("saving");
+                    }
+                    
+                    var saveButtons = document.querySelectorAll(".save-button.saving");
+                    for (var l = 0; l < saveButtons.length; l++) {
+                        var button = saveButtons[l];
+                        button.disabled = false;
+                        button.classList.remove("saving");
+                        var originalText = button.getAttribute("data-original-text");
+                        if (originalText) {
+                            button.value = originalText;
+                            button.removeAttribute("data-original-text");
+                        }
                     }
                 }
                 return;
@@ -337,19 +386,50 @@ var Server = /** @class */ (function () {
                 }
                 break;
             case "saveSettings":
-                // Handle settings save with enhanced feedback
+                // Handle settings save with enhanced feedback (secondary handler)
+                console.log("DEBUG: Processing saveSettings response (secondary handler)", response);
+                
+                // Always hide loading indicator first
+                if (typeof showElement === 'function') {
+                    showElement("loading", false);
+                }
+                
                 SERVER = response;
                 if (response.hasOwnProperty("settings")) {
                     createLayout();
                 }
-                // Show success notification
-                if (typeof showNotification === 'function') {
-                    showNotification("Settings saved successfully!", "success", 3000);
-                }
-                // Clear all 'changed' classes to indicate save is complete
-                var changedElements = document.getElementsByClassName("changed");
-                for (var i = changedElements.length - 1; i >= 0; i--) {
-                    changedElements[i].classList.remove("changed");
+                
+                if (response["status"] !== false) {
+                    // Show success notification
+                    if (typeof showNotification === 'function') {
+                        showNotification("Settings saved successfully!", "success", 3000);
+                    }
+                    
+                    // Clear all 'changed' classes to indicate save is complete
+                    var changedElements = document.getElementsByClassName("changed");
+                    for (var i = changedElements.length - 1; i >= 0; i--) {
+                        changedElements[i].classList.remove("changed");
+                        changedElements[i].classList.remove("saving");
+                    }
+                    
+                    // Reset save buttons
+                    var saveButtons = document.querySelectorAll(".save-button.saving");
+                    for (var j = 0; j < saveButtons.length; j++) {
+                        var button = saveButtons[j];
+                        button.disabled = false;
+                        button.classList.remove("saving");
+                        var originalText = button.getAttribute("data-original-text");
+                        if (originalText) {
+                            button.value = originalText;
+                            button.removeAttribute("data-original-text");
+                        }
+                    }
+                } else {
+                    // Handle error case
+                    if (typeof showNotification === 'function') {
+                        var errorMsg = response.error || "Failed to save settings";
+                        showNotification("Error: " + errorMsg, "error", 5000);
+                    }
                 }
                 break;
             case "saveFilesM3U":

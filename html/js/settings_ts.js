@@ -759,39 +759,6 @@ function saveSettingsWithFeedback(button) {
     }
     
     // Call the original save function
+    // The response will be handled by the WebSocket response handler in network_ts.js
     saveSettings();
-    
-    // Set up a listener for when the save completes
-    // This will be triggered by the WebSocket response handler
-    var originalServerConnection = SERVER_CONNECTION;
-    var checkSaveComplete = setInterval(function() {
-        if (!SERVER_CONNECTION && originalServerConnection) {
-            // Save completed
-            clearInterval(checkSaveComplete);
-            
-            // Reset button state
-            if (button) {
-                button.disabled = false;
-                button.classList.remove("saving");
-                var originalText = button.getAttribute("data-original-text");
-                if (originalText) {
-                    button.value = originalText;
-                }
-            }
-            
-            // Remove saving class from elements and add saved class temporarily
-            var allElements = document.getElementById("content_settings").querySelectorAll(".saving");
-            for (var i = 0; i < allElements.length; i++) {
-                allElements[i].classList.remove("saving");
-                allElements[i].classList.add("saved");
-                
-                // Remove saved class after 2 seconds
-                setTimeout(function(elem) {
-                    return function() {
-                        elem.classList.remove("saved");
-                    };
-                }(allElements[i]), 2000);
-            }
-        }
-    }, 100);
 }
