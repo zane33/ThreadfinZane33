@@ -244,12 +244,74 @@ function createClintInfo(obj) {
 }
 
 function showElement(elmID, type) {
+  var element = document.getElementById(elmID);
+  
+  // Special handling for Bootstrap modals (like loading)
+  if (element && element.classList.contains('modal')) {
+    console.log("DEBUG: Handling Bootstrap modal for element:", elmID, "show:", type);
+    
+    try {
+      if (type === true) {
+        // Show modal using Bootstrap
+        if (window.bootstrap && bootstrap.Modal) {
+          var modal = new bootstrap.Modal(element);
+          modal.show();
+        } else if (window.$ && $.fn.modal) {
+          $(element).modal('show');
+        } else {
+          // Fallback to direct style manipulation
+          element.style.display = 'block';
+          element.classList.add('show');
+          document.body.classList.add('modal-open');
+        }
+        console.log("DEBUG: Modal shown for:", elmID);
+      } else {
+        // Hide modal using Bootstrap
+        if (window.bootstrap && bootstrap.Modal) {
+          var modal = bootstrap.Modal.getInstance(element);
+          if (modal) {
+            modal.hide();
+          } else {
+            // Force hide if no instance exists
+            element.style.display = 'none';
+            element.classList.remove('show');
+            document.body.classList.remove('modal-open');
+            // Remove any leftover backdrops
+            var backdrops = document.querySelectorAll('.modal-backdrop');
+            backdrops.forEach(function(backdrop) {
+              backdrop.remove();
+            });
+          }
+        } else if (window.$ && $.fn.modal) {
+          $(element).modal('hide');
+        } else {
+          // Fallback to direct style manipulation
+          element.style.display = 'none';
+          element.classList.remove('show');
+          document.body.classList.remove('modal-open');
+          // Remove any leftover backdrops
+          var backdrops = document.querySelectorAll('.modal-backdrop');
+          backdrops.forEach(function(backdrop) {
+            backdrop.remove();
+          });
+        }
+        console.log("DEBUG: Modal hidden for:", elmID);
+      }
+    } catch (error) {
+      console.error("Error handling modal:", error);
+      // Fallback to basic display manipulation
+      element.style.display = type ? 'block' : 'none';
+    }
+    return;
+  }
+  
+  // Original behavior for non-modal elements
   switch (type) {
     case true: cssClass = "block"; break;
     case false: cssClass = "none"; break;
   }
 
-  document.getElementById(elmID).className = cssClass;
+  element.className = cssClass;
 }
 
 function showPopUpElement(elm) {

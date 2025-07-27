@@ -63,10 +63,48 @@ function showElement(elmID, type) {
     if (elmID == "loading") {
         switch (type) {
             case true:
-                loadingModal.show();
+                console.log("DEBUG: Showing loading modal");
+                try {
+                    // Ensure we're not already showing
+                    var loadingElement = document.getElementById("loading");
+                    if (!loadingElement.classList.contains('show')) {
+                        loadingModal.show();
+                    }
+                } catch (error) {
+                    console.error("Error showing loading modal:", error);
+                }
                 break;
             case false:
-                loadingModal.hide();
+                console.log("DEBUG: Hiding loading modal");
+                try {
+                    var loadingElement = document.getElementById("loading");
+                    if (loadingElement.classList.contains('show')) {
+                        loadingModal.hide();
+                    }
+                    
+                    // Force cleanup after a short delay
+                    setTimeout(function() {
+                        // Remove modal backdrop elements
+                        var backdrops = document.querySelectorAll('.modal-backdrop');
+                        backdrops.forEach(function(backdrop) {
+                            if (backdrop.parentNode) {
+                                backdrop.parentNode.removeChild(backdrop);
+                            }
+                        });
+                        // Ensure body classes are cleaned up
+                        document.body.classList.remove('modal-open');
+                        document.body.style.paddingRight = '';
+                        document.body.style.overflow = '';
+                    }, 100);
+                } catch (e) {
+                    console.warn("Error hiding loading modal:", e);
+                    // Fallback: force hide the modal element
+                    var loadingElement = document.getElementById("loading");
+                    if (loadingElement) {
+                        loadingElement.style.display = 'none';
+                        loadingElement.classList.remove('show');
+                    }
+                }
                 break;
         }
     }

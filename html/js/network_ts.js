@@ -153,7 +153,7 @@ var WebSocketManager = /** @class */ (function () {
                 // Handle settings save response with visual feedback
                 console.log("DEBUG: Processing saveSettings response", response);
                 
-                // Always hide loading indicator first
+                // Hide loading indicator
                 if (typeof showElement === 'function') {
                     showElement("loading", false);
                 }
@@ -315,7 +315,10 @@ var Server = /** @class */ (function () {
     Server.prototype.handleResponse = function (response) {
         if (this.cmd !== "updateLog") {
             SERVER_CONNECTION = false;
+            
+            // Force hide loading indicator with both methods to ensure it works
             showElement("loading", false);
+            
             // Only log non-updateLog responses to reduce noise
             console.log("DEBUG: Response received for:", this.cmd);
             console.log("DEBUG: Loading indicator hidden for command:", this.cmd);
@@ -389,7 +392,7 @@ var Server = /** @class */ (function () {
                 // Handle settings save with enhanced feedback (secondary handler)
                 console.log("DEBUG: Processing saveSettings response (secondary handler)", response);
                 
-                // Always hide loading indicator first
+                // Hide loading indicator
                 if (typeof showElement === 'function') {
                     showElement("loading", false);
                 }
