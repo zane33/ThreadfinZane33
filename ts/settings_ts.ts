@@ -867,10 +867,22 @@ function showSettings() {
 
 function saveSettings() {
   console.log("Save Settings");
-
+  
+  // Show loading immediately
+  showElement("loading", true);
+  
+  // Check if there are any changes to save
   var cmd = "saveSettings"
   var div = document.getElementById("content_settings")
   var settings = div.getElementsByClassName("changed")
+  
+  if (settings.length === 0) {
+    showElement("loading", false);
+    if (typeof showNotification === 'function') {
+      showNotification("No changes to save.", "info", 2000);
+    }
+    return;
+  }
 
   var newSettings = new Object();
 
@@ -932,4 +944,38 @@ function saveSettings() {
 
   var server: Server = new Server(cmd)
   server.request(data)
+}
+
+// Enhanced save function with visual feedback
+function saveSettingsWithFeedback(button: HTMLInputElement) {
+  // Get all changed elements before starting save
+  var div = document.getElementById("content_settings");
+  var settings = div.getElementsByClassName("changed");
+  
+  if (settings.length === 0) {
+    if (typeof showNotification === 'function') {
+      showNotification("No changes to save.", "info", 2000);
+    }
+    return;
+  }
+  
+  // Disable the save button and show loading state
+  if (button) {
+    button.disabled = true;
+    button.classList.add("saving");
+    var originalText = button.value;
+    button.value = "Saving...";
+    
+    // Store original text for restoration
+    button.setAttribute("data-original-text", originalText);
+  }
+  
+  // Add saving class to all changed elements
+  for (var i = 0; i < settings.length; i++) {
+    settings[i].classList.add("saving");
+  }
+  
+  // Call the original save function
+  // The response will be handled by the WebSocket response handler in network_ts.js
+  saveSettings();
 }
