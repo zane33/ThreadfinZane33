@@ -102,12 +102,7 @@ func updateUrlsJson() {
 		return
 	}
 
-	// Only build XEPG if files were updated or no cached data exists
-	if _, err := os.Stat(System.File.XEPG); Settings.FilesUpdate || os.IsNotExist(err) {
-		buildXEPG(false)
-	} else {
-		showInfo("XEPG:Using cached data, skipping rebuild for faster startup")
-	}
+	buildXEPG(false)
 }
 
 // Einstellungen laden und default Werte setzen (Threadfin)
@@ -142,7 +137,7 @@ func loadSettings() (settings SettingsStruct, err error) {
 	defaults["ffmpeg.options"] = System.FFmpeg.DefaultOptions
 	defaults["vlc.options"] = System.VLC.DefaultOptions
 	defaults["files"] = dataMap
-	defaults["files.update"] = false
+	defaults["files.update"] = true
 	defaults["filter"] = make(map[string]interface{})
 	defaults["git.branch"] = System.Branch
 	defaults["language"] = "en"
