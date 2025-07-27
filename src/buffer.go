@@ -30,6 +30,27 @@ type BackupStream struct {
 	URL        string
 }
 
+// getOrCreatePlaylistAtomic safely gets an existing playlist or creates a new one
+// This prevents race conditions during playlist creation
+func getOrCreatePlaylistAtomic(playlistID string) (Playlist, bool) {
+	// Create template for new playlist
+	newPlaylist := Playlist{
+		Folder:     System.Folder.Temp + playlistID + string(os.PathSeparator),
+		PlaylistID: playlistID,
+		Streams:    make(map[int]ThisStream),
+		Clients:    make(map[int]ThisClient),
+	}
+	
+	// Use LoadOrStore for atomic operation - prevents race conditions
+	actual, loaded := BufferInformation.LoadOrStore(playlistID, newPlaylist)
+	return actual.(Playlist), !loaded // Return playlist and whether it was created (not loaded)
+}
+
+// updatePlaylistAtomic safely updates a playlist in the BufferInformation map
+func updatePlaylistAtomic(playlistID string, playlist Playlist) {
+	BufferInformation.Store(playlistID, playlist)
+}
+
 func getActiveClientCount() (count int) {
 	count = 0
 	cleanUpStaleClients() // Ensure stale clients are removed first
@@ -81,13 +102,28 @@ func cleanUpStaleClients() {
 			return true
 		}
 
+		playlistID := playlist.PlaylistID
+		modified := false
+		
 		for clientID, client := range playlist.Clients {
 			if client.Connection <= 0 {
-				fmt.Printf("Removing stale client ID %d from playlist %s\n", clientID, playlist.PlaylistID)
+				fmt.Printf("Removing stale client ID %d from playlist %s\n", clientID, playlistID)
 				delete(playlist.Clients, clientID)
+				delete(playlist.Streams, clientID) // Also remove corresponding stream
+				modified = true
 			}
 		}
-		BufferInformation.Store(key, playlist)
+		
+		// Only update if we made changes
+		if modified {
+			if len(playlist.Clients) == 0 {
+				// No clients left, remove entire playlist
+				BufferInformation.Delete(key)
+				fmt.Printf("Removed empty playlist: %s\n", playlistID)
+			} else {
+				updatePlaylistAtomic(playlistID, playlist)
+			}
+		}
 		return true
 	})
 }
@@ -162,33 +198,30 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 	w.Header().Set("Content-Type", "video/mp2t")
 	w.Header().Set("Accept-Ranges", "bytes")
 
-	// Check whether the playlist is already in use
-	Lock.Lock()
-	if p, ok := BufferInformation.Load(playlistID); !ok {
-		Lock.Unlock() // Unlock early if not found
+	// Thread-safe playlist creation using atomic operations
+	var playlistCreated bool
+	playlist, playlistCreated = getOrCreatePlaylistAtomic(playlistID)
+	
+	// If we created a new playlist, initialize it properly
+	if playlistCreated {
+		showDebug(fmt.Sprintf("Creating new playlist for ID: %s", playlistID), 1)
+		
 		var playlistType string
-
-		// Playlist is not yet in use, create default values for the playlist
-		playlist.Folder = System.Folder.Temp + playlistID + string(os.PathSeparator)
-		playlist.PlaylistID = playlistID
-		playlist.Streams = make(map[int]ThisStream)
-		playlist.Clients = make(map[int]ThisClient)
-
+		
 		err := checkVFSFolder(playlist.Folder, bufferVFS)
 		if err != nil {
+			// Clean up the playlist we just created
+			BufferInformation.Delete(playlistID)
 			ShowError(err, 000)
 			httpStatusError(w, r, 404)
 			return
 		}
 
 		switch playlist.PlaylistID[0:1] {
-
 		case "M":
 			playlistType = "m3u"
-
 		case "H":
 			playlistType = "hdhr"
-
 		}
 
 		var playListBuffer string
@@ -207,20 +240,15 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 		systemMutex.Unlock()
 
 		playlist.Buffer = playListBuffer
-
 		playlist.Tuner = getTuner(playlistID, playlistType)
-
 		playlist.PlaylistName = getProviderParameter(playlist.PlaylistID, playlistType, "name")
-
 		playlist.HttpProxyIP = getProviderParameter(playlist.PlaylistID, playlistType, "http_proxy.ip")
 		playlist.HttpProxyPort = getProviderParameter(playlist.PlaylistID, playlistType, "http_proxy.port")
-
 		playlist.HttpUserOrigin = getProviderParameter(playlist.PlaylistID, playlistType, "http_headers.origin")
 		playlist.HttpUserReferer = getProviderParameter(playlist.PlaylistID, playlistType, "http_headers.referer")
 
 		// Create default values for the stream
 		streamID = createStreamID(playlist.Streams, getClientIP(r), r.UserAgent())
-
 		client.Connection += 1
 
 		stream.URL = streamingURL
@@ -233,13 +261,11 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 		playlist.Streams[streamID] = stream
 		playlist.Clients[streamID] = client
 
-		Lock.Lock()
-		BufferInformation.Store(playlistID, playlist)
-		Lock.Unlock()
-
+		// Store the fully initialized playlist atomically
+		updatePlaylistAtomic(playlistID, playlist)
+		
 	} else {
-		playlist = p.(Playlist)
-		Lock.Unlock()
+		showDebug(fmt.Sprintf("Using existing playlist for ID: %s", playlistID), 1)
 
 		// Playlist is already used for streaming
 		// Check if the URL is already streaming from another client.
@@ -264,9 +290,8 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 
 					playlist.Clients[streamID] = client
 
-					Lock.Lock()
-					BufferInformation.Store(playlistID, playlist)
-					Lock.Unlock()
+					// Store updated playlist atomically
+					updatePlaylistAtomic(playlistID, playlist)
 
 					debug = fmt.Sprintf("Restream Status:Playlist: %s - Channel: %s - Connections: %d", playlist.PlaylistName, stream.ChannelName, client.Connection)
 
@@ -351,9 +376,8 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 			playlist.Streams[streamID] = stream
 			playlist.Clients[streamID] = client
 
-			Lock.Lock()
-			BufferInformation.Store(playlistID, playlist)
-			Lock.Unlock()
+			// Store updated playlist atomically
+			updatePlaylistAtomic(playlistID, playlist)
 
 		}
 
@@ -374,9 +398,8 @@ func bufferingStream(playlistID string, streamingURL string, backupStream1 *Back
 
 		playlist.Streams[streamID] = stream
 
-		Lock.Lock()
-		BufferInformation.Store(playlistID, playlist)
-		Lock.Unlock()
+		// Store updated playlist atomically
+		updatePlaylistAtomic(playlistID, playlist)
 
 		// Create client connection first
 		var clients ClientConnection

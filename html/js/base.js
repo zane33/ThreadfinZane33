@@ -20,7 +20,7 @@ function pageReady() {
   var data = new Object();
   data["cmd"] = "getServerConfig";
   Threadfin(data);
-  //showLoadingScreen(false);
+  showLoadingScreen(false);
 
   var resizeHandle = document.getElementById("openStreams");
   var box = document.getElementById("myStreamsBox");
@@ -112,7 +112,7 @@ function startWebSocket() {
     return;
   }
 
-  //ws.send('{"cmd": "getServerConfig1"}');
+  ws.send('{"cmd": "getServerConfig"}');
 
 }
 

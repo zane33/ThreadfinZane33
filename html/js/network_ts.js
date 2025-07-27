@@ -48,6 +48,10 @@ var WebSocketManager = /** @class */ (function () {
             if (_this.reconnectTimer) {
                 clearTimeout(_this.reconnectTimer);
                 _this.reconnectTimer = null;
+                // Show reconnection success
+                if (typeof showNotification === 'function') {
+                    showNotification("Connection restored!", "success", 2000);
+                }
             }
         };
         this.ws.onmessage = function (e) {
@@ -103,11 +107,24 @@ var WebSocketManager = /** @class */ (function () {
             console.log("DEBUG: WebSocket connection closed, scheduling reconnect");
             WS_AVAILABLE = false;
             _this.ws = null;
-            // Reconnect after 5 seconds
+            
+            // Show connection status to user
+            if (typeof showNotification === 'function') {
+                showNotification("Connection lost. Attempting to reconnect...", "warning", 5000);
+            }
+            
+            // Reconnect after 3 seconds (reduced from 5)
             if (!_this.reconnectTimer) {
                 _this.reconnectTimer = setTimeout(function () {
                     _this.connect();
-                }, 5000);
+                    // Refresh data after reconnection
+                    if (WS_AVAILABLE) {
+                        console.log("DEBUG: Refreshing data after reconnection");
+                        _this.sendRequest("getServerConfig", {}, function(response) {
+                            console.log("DEBUG: Data refreshed after reconnection");
+                        });
+                    }
+                }, 3000);
             }
         };
     };
@@ -130,6 +147,24 @@ var WebSocketManager = /** @class */ (function () {
                 }
                 if (response.hasOwnProperty("token")) {
                     console.log("TOKEN");
+                }
+                return;
+            case "saveSettings":
+                // Handle settings save response with visual feedback
+                if (response["status"] !== false) {
+                    SERVER = response;
+                    if (response.hasOwnProperty("settings")) {
+                        createLayout();
+                    }
+                    // Show success notification
+                    if (typeof showNotification === 'function') {
+                        showNotification("Settings saved successfully!", "success", 3000);
+                    }
+                    // Clear all 'changed' classes to indicate save is complete
+                    var changedElements = document.getElementsByClassName("changed");
+                    for (var i = changedElements.length - 1; i >= 0; i--) {
+                        changedElements[i].classList.remove("changed");
+                    }
                 }
                 return;
             default:
@@ -179,6 +214,10 @@ var Server = /** @class */ (function () {
         }
         // Prevent multiple simultaneous non-updateLog requests
         if (SERVER_CONNECTION == true && this.cmd !== "updateLog") {
+            console.log("DEBUG: Request blocked - another operation in progress:", this.cmd);
+            if (typeof showNotification === 'function') {
+                showNotification("Please wait for the current operation to complete.", "warning", 2000);
+            }
             return;
         }
         if (this.cmd !== "updateLog") {
@@ -197,6 +236,7 @@ var Server = /** @class */ (function () {
             SERVER_CONNECTION = true;
             UNDO = new Object();
             showElement("loading", true);
+            console.log("DEBUG: Loading indicator shown for command:", this.cmd);
         }
         var protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
         var url = protocol + window.location.hostname + ":" + window.location.port + "/data/" + "?Token=" + getCookie("Token");
@@ -229,6 +269,7 @@ var Server = /** @class */ (function () {
             showElement("loading", false);
             // Only log non-updateLog responses to reduce noise
             console.log("DEBUG: Response received for:", this.cmd);
+            console.log("DEBUG: Loading indicator hidden for command:", this.cmd);
             console.log("DEBUG: Response data:", response);
         }
         // Process the response using the same logic as the old implementation
@@ -295,6 +336,22 @@ var Server = /** @class */ (function () {
                     console.log("TOKEN");
                 }
                 break;
+            case "saveSettings":
+                // Handle settings save with enhanced feedback
+                SERVER = response;
+                if (response.hasOwnProperty("settings")) {
+                    createLayout();
+                }
+                // Show success notification
+                if (typeof showNotification === 'function') {
+                    showNotification("Settings saved successfully!", "success", 3000);
+                }
+                // Clear all 'changed' classes to indicate save is complete
+                var changedElements = document.getElementsByClassName("changed");
+                for (var i = changedElements.length - 1; i >= 0; i--) {
+                    changedElements[i].classList.remove("changed");
+                }
+                break;
             case "saveFilesM3U":
             case "saveFilesXMLTV":
             case "saveFilesHDHR":
@@ -303,6 +360,10 @@ var Server = /** @class */ (function () {
                 // For save operations, update SERVER and refresh menu
                 SERVER = response;
                 createLayout();
+                // Show success notification for file saves
+                if (typeof showNotification === 'function') {
+                    showNotification("Data saved successfully!", "success", 3000);
+                }
                 break;
             default:
                 // For other commands, just update SERVER

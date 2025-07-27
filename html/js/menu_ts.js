@@ -724,7 +724,9 @@ class ShowContent extends Content {
 
             case "settings":
                 var input = this.createInput("button", menuKey, "{{.button.save}}");
-                input.setAttribute("onclick", 'javascript: saveSettings();');
+                input.setAttribute("onclick", 'javascript: saveSettingsWithFeedback(this);');
+                input.setAttribute("class", "save-button");
+                input.setAttribute("id", "settings-save-btn");
                 interaction.appendChild(input);
 
                 input = this.createInput("button", menuKey, "{{.button.backup}}");

@@ -661,10 +661,25 @@ function showSettings() {
 }
 function saveSettings() {
     console.log("Save Settings");
-    var cmd = "saveSettings";
+    
+    // Show loading immediately
+    showElement("loading", true);
+    
+    // Check if there are any changes to save
     var div = document.getElementById("content_settings");
     var settings = div.getElementsByClassName("changed");
+    
+    if (settings.length === 0) {
+        showElement("loading", false);
+        if (typeof showNotification === 'function') {
+            showNotification("No changes to save.", "info", 2000);
+        }
+        return;
+    }
+    
+    var cmd = "saveSettings";
     var newSettings = new Object();
+    
     for (let i = 0; i < settings.length; i++) {
         var name;
         var value;
@@ -704,8 +719,79 @@ function saveSettings() {
                 break;
         }
     }
+    
+    // Show what's being saved in console for debugging
+    console.log("Saving settings:", newSettings);
+    
     var data = new Object();
     data["settings"] = newSettings;
     var server = new Server(cmd);
     server.request(data);
+}
+
+// Enhanced save function with visual feedback
+function saveSettingsWithFeedback(button) {
+    // Get all changed elements before starting save
+    var div = document.getElementById("content_settings");
+    var settings = div.getElementsByClassName("changed");
+    
+    if (settings.length === 0) {
+        if (typeof showNotification === 'function') {
+            showNotification("No changes to save.", "info", 2000);
+        }
+        return;
+    }
+    
+    // Disable the save button and show loading state
+    if (button) {
+        button.disabled = true;
+        button.classList.add("saving");
+        var originalText = button.value;
+        button.value = "Saving...";
+        
+        // Store original text for restoration
+        button.setAttribute("data-original-text", originalText);
+    }
+    
+    // Add saving class to all changed elements
+    for (var i = 0; i < settings.length; i++) {
+        settings[i].classList.add("saving");
+    }
+    
+    // Call the original save function
+    saveSettings();
+    
+    // Set up a listener for when the save completes
+    // This will be triggered by the WebSocket response handler
+    var originalServerConnection = SERVER_CONNECTION;
+    var checkSaveComplete = setInterval(function() {
+        if (!SERVER_CONNECTION && originalServerConnection) {
+            // Save completed
+            clearInterval(checkSaveComplete);
+            
+            // Reset button state
+            if (button) {
+                button.disabled = false;
+                button.classList.remove("saving");
+                var originalText = button.getAttribute("data-original-text");
+                if (originalText) {
+                    button.value = originalText;
+                }
+            }
+            
+            // Remove saving class from elements and add saved class temporarily
+            var allElements = document.getElementById("content_settings").querySelectorAll(".saving");
+            for (var i = 0; i < allElements.length; i++) {
+                allElements[i].classList.remove("saving");
+                allElements[i].classList.add("saved");
+                
+                // Remove saved class after 2 seconds
+                setTimeout(function(elem) {
+                    return function() {
+                        elem.classList.remove("saved");
+                    };
+                }(allElements[i]), 2000);
+            }
+        }
+    }, 100);
 }

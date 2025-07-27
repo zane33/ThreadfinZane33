@@ -12,14 +12,14 @@ services:
     container_name: threadfin
     restart: unless-stopped
     
-    # Use host network mode for better SSDP/UPnP compatibility
-    network_mode: host
+    # Use bridge networking for Docker Desktop compatibility
+    # network_mode: host  # Disabled - doesn't work on Docker Desktop for Windows
     
-    # Port mapping for bridge networking (disabled when using host mode)
-    #ports:
-    #  - "34400:34400"           # HTTP API and streaming
-    #  - "1900:1900/udp"         # SSDP/UPnP discovery (mapped to avoid conflicts)
-        #- "65002:65001/udp"       # HDHomeRun UDP discovery
+    # Port mapping for bridge networking
+    ports:
+      - "34400:34400"           # HTTP API and streaming
+      - "1900:1900/udp"         # SSDP/UPnP discovery
+      # - "65002:65001/udp"     # HDHomeRun UDP discovery (if needed)
     
     volumes:
       - threadfin_conf:/home/threadfin/conf
@@ -30,11 +30,11 @@ services:
     environment:
       - THREADFIN_PORT=34400
       - THREADFIN_BIND_IP_ADDRESS=0.0.0.0
-      - THREADFIN_DEBUG=0
+      - THREADFIN_DEBUG=1             # Enable debug for troubleshooting
       - THREADFIN_BRANCH=main
-      - THREADFIN_DOMAIN=192.168.4.5:34400
-      - THREADFIN_FAST_STARTUP=true  # Skip provider file updates for faster startup
-      - TZ=Pacific/Auckland # Set your timezone
+      # - THREADFIN_DOMAIN=192.168.4.5:34400  # Remove fixed domain for Docker Desktop
+      - THREADFIN_FAST_STARTUP=true  # Skip provider file updates for faster startup  
+      - TZ=UTC                        # Use UTC for consistency
     
     # DNS configuration to resolve external hostnames
     dns:

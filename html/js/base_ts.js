@@ -588,3 +588,21 @@ function updateLog() {
     var server = new Server("updateLog");
     server.request(new Object());
 }
+
+// Function to refresh server data when needed
+function refreshServerData() {
+    console.log("Refreshing server data...");
+    var server = new Server("getServerConfig");
+    server.request(new Object());
+}
+
+// Function to check if data is stale and refresh if needed
+function checkAndRefreshData() {
+    // Check if SERVER object exists and has basic required properties
+    if (!SERVER || !SERVER.hasOwnProperty("settings") || !SERVER.hasOwnProperty("info")) {
+        console.log("DEBUG: Server data appears stale or missing, refreshing...");
+        refreshServerData();
+        return true;
+    }
+    return false;
+}
