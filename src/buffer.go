@@ -1158,13 +1158,13 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 			path = Settings.FFmpegPath
 			options = Settings.FFmpegOptions
 			
-			// Optimize ffmpeg options for M3U8/HLS streams
+			// Optimized ffmpeg options for M3U8/HLS streams for better Plex compatibility
 			if strings.Contains(url, ".m3u8") {
 				showInfo("Optimizing ffmpeg options for M3U8/HLS stream")
 				showInfo("HLS Stream URL: " + url)
-				// Enhanced HLS-specific options for reliable MPEG-TS output for Plex
-				options = "-hide_banner -loglevel warning -fflags +genpts -allowed_extensions ALL -protocol_whitelist file,http,https,tcp,tls,crypto -i [URL] -c:v copy -c:a copy -f mpegts -muxrate 10000k -mpegts_m2ts_mode 0 -mpegts_original_network_id 0x1 -mpegts_transport_stream_id 0x1 -mpegts_service_id 0x1 -mpegts_pmt_start_pid 0x1000 -mpegts_start_pid 0x100 -avoid_negative_ts make_zero pipe:1"
-				showInfo("Applied optimized HLS ffmpeg options")
+				// Simplified HLS options for better compatibility and faster initialization
+				options = "-hide_banner -loglevel error -fflags +genpts -allowed_extensions ALL -protocol_whitelist file,http,https,tcp,tls,crypto -i [URL] -c copy -f mpegts -avoid_negative_ts make_zero -muxrate 10000k pipe:1"
+				showInfo("Applied simplified HLS ffmpeg options for Plex compatibility")
 			}
 
 		case "vlc":
@@ -1390,10 +1390,10 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 
 			select {
 			case timeout := <-t:
-				// Increased timeout for M3U8 streams - they can take longer to establish
-				var timeoutLimit int = 60
+				// More generous timeout for M3U8 streams - they need time for playlist initialization
+				var timeoutLimit int = 90
 				if strings.Contains(url, ".m3u8") {
-					timeoutLimit = 90 // Give M3U8 streams more time to initialize
+					timeoutLimit = 180 // Give M3U8 streams 3 minutes to initialize properly
 				}
 				if int(timeout) >= timeoutLimit && tmpSegment == 1 {
 					cmd.Process.Kill()
@@ -1406,9 +1406,9 @@ func thirdPartyBuffer(streamID int, playlistID string, useBackup bool, backupNum
 					return
 				}
 				// For established streams, allow longer timeout for temporary network issues
-				if timeout >= 300 && tmpSegment > 1 {
+				if timeout >= 600 && tmpSegment > 1 {
 					cmd.Process.Kill()
-					err = errors.New("Stream timeout after 5 minutes of inactivity")
+					err = errors.New("Stream timeout after 10 minutes of inactivity")
 					ShowError(err, 4006)
 					killClientConnection(streamID, playlistID, false)
 					addErrorToStream(err)

@@ -332,6 +332,9 @@ func createXEPGMapping() {
 
 // XEPG Datenbank erstellen / aktualisieren
 func createXEPGDatabase() (err error) {
+	// Add proper mutex protection for thread safety
+	xepgMutex.Lock()
+	defer xepgMutex.Unlock()
 
 	var allChannelNumbers = make([]float64, 0, System.UnfilteredChannelLimit)
 	Data.Cache.Streams.Active = make([]string, 0, System.UnfilteredChannelLimit)
@@ -1119,19 +1122,28 @@ func createLiveProgram(xepgChannel XEPGChannelStruct, channelId string) []*Progr
 		timeString := strings.TrimSpace(timePart)
 		timeString = strings.ReplaceAll(timeString, "  ", " ")
 
-		// Handle timezone if present
-		var location *time.Location
-		if strings.Contains(timeString, "ET") || strings.Contains(timeString, "EST") {
-			location, _ = time.LoadLocation("America/New_York")
-		} else if strings.Contains(timeString, "CT") || strings.Contains(timeString, "CST") {
-			location, _ = time.LoadLocation("America/Chicago")
-		} else if strings.Contains(timeString, "MT") || strings.Contains(timeString, "MST") {
-			location, _ = time.LoadLocation("America/Denver")
-		} else if strings.Contains(timeString, "PT") || strings.Contains(timeString, "PST") {
-			location, _ = time.LoadLocation("America/Los_Angeles")
-		} else {
-			location = currentTime.Location()
+		// Enhanced timezone handling with fallbacks
+		var location *time.Location = currentTime.Location() // Default to system timezone
+		
+		// Handle common US timezones
+		if strings.Contains(timeString, "ET") || strings.Contains(timeString, "EST") || strings.Contains(timeString, "EDT") {
+			if loc, err := time.LoadLocation("America/New_York"); err == nil {
+				location = loc
+			}
+		} else if strings.Contains(timeString, "CT") || strings.Contains(timeString, "CST") || strings.Contains(timeString, "CDT") {
+			if loc, err := time.LoadLocation("America/Chicago"); err == nil {
+				location = loc
+			}
+		} else if strings.Contains(timeString, "MT") || strings.Contains(timeString, "MST") || strings.Contains(timeString, "MDT") {
+			if loc, err := time.LoadLocation("America/Denver"); err == nil {
+				location = loc
+			}
+		} else if strings.Contains(timeString, "PT") || strings.Contains(timeString, "PST") || strings.Contains(timeString, "PDT") {
+			if loc, err := time.LoadLocation("America/Los_Angeles"); err == nil {
+				location = loc
+			}
 		}
+		// For unsupported timezones, fallback to system timezone (already set above)
 
 		// Remove timezone from timeString
 		timeString = strings.ReplaceAll(timeString, "ET", "")

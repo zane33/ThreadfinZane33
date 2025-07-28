@@ -565,30 +565,38 @@ func WS(w http.ResponseWriter, r *http.Request) {
 
 		case "updateFileM3U":
 			showInfo("WebSocket:" + "Connection " + connID + " processing updateFileM3U command")
-			// Reset cache for urls.json
-			var filename = getPlatformFile(System.Folder.Config + "urls.json")
-			saveMapToJSONFile(filename, make(map[string]StreamInfo))
-			Data.Cache.StreamingURLS = make(map[string]StreamInfo)
+			
+			// Start the update process in a goroutine to avoid blocking the WebSocket
+			go func() {
+				// Reset cache for urls.json
+				var filename = getPlatformFile(System.Folder.Config + "urls.json")
+				saveMapToJSONFile(filename, make(map[string]StreamInfo))
+				Data.Cache.StreamingURLS = make(map[string]StreamInfo)
 
-			showInfo("WebSocket:" + "Connection " + connID + " about to call updateFile function")
-			err = updateFile(request, "m3u")
-			if err == nil {
-				showInfo("WebSocket:" + "Connection " + connID + " updateFile completed successfully")
-				response.OpenMenu = strconv.Itoa(indexOfString("playlist", System.WEB.Menu))
-				// Rebuild XEPG database to ensure URLs are updated
-				err = createXEPGDatabase()
-				if err != nil {
-					ShowError(err, 000)
-					break
+				showInfo("WebSocket:" + "Connection " + connID + " about to call updateFile function")
+				updateErr := updateFile(request, "m3u")
+				if updateErr == nil {
+					showInfo("WebSocket:" + "Connection " + connID + " updateFile completed successfully")
+					// Rebuild XEPG database to ensure URLs are updated
+					updateErr = createXEPGDatabase()
+					if updateErr != nil {
+						ShowError(updateErr, 000)
+						return
+					}
+					// Update URLs
+					updateUrlsJson()
+					// Create M3U file to ensure URLs are properly generated
+					createM3UFile()
+					showInfo("WebSocket:" + "Connection " + connID + " updateFileM3U processing completed")
+				} else {
+					showInfo("WebSocket:" + "Connection " + connID + " updateFile failed with error: " + updateErr.Error())
 				}
-				// Update URLs
-				updateUrlsJson()
-				// Create M3U file to ensure URLs are properly generated
-				createM3UFile()
-				showInfo("WebSocket:" + "Connection " + connID + " updateFileM3U processing completed")
-			} else {
-				showInfo("WebSocket:" + "Connection " + connID + " updateFile failed with error: " + err.Error())
-			}
+			}()
+			
+			// Return immediate success response to prevent UI loading hang
+			response.Status = true
+			response.Message = "Playlist update started in background"
+			response.OpenMenu = strconv.Itoa(indexOfString("playlist", System.WEB.Menu))
 
 		case "saveFilesHDHR":
 			err = saveFiles(request, "hdhr")
@@ -722,12 +730,11 @@ func WS(w http.ResponseWriter, r *http.Request) {
 			showInfo("WebSocket:" + "Connection " + connID + " failed to send response: " + err.Error())
 		} else {
 			showInfo("WebSocket:" + "Connection " + connID + " response sent successfully")
-			// For long-running operations, add a longer delay to ensure the client receives the response
-			// before closing the connection
+			// Reduced delay to prevent UI hanging - background processing handles long operations
 			if request.Cmd == "updateFileM3U" || request.Cmd == "updateFileXMLTV" || request.Cmd == "updateFileHDHR" {
-				time.Sleep(2000 * time.Millisecond)
+				time.Sleep(200 * time.Millisecond) // Reduced from 2000ms
 			} else {
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond) // Reduced from 500ms
 			}
 			break
 		}
