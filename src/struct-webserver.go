@@ -140,6 +140,7 @@ type ResponseStruct struct {
 	Wizard              int                    `json:"wizard,omitempty"`
 	XEPG                map[string]interface{} `json:"xepg,required"`
 	ProbeInfo           ProbeInfoStruct        `json:"probeInfo,omitempty"`
+	SystemStats         SystemStatsStruct      `json:"systemStats,omitempty"`
 
 	Notification map[string]Notification `json:"notification,omitempty"`
 }
@@ -148,6 +149,73 @@ type ProbeInfoStruct struct {
 	Resolution   string `json:"resolution,omitempty"`
 	FrameRate    string `json:"frameRate,omitempty"`
 	AudioChannel string `json:"audioChannel,omitempty"`
+}
+
+// SystemStatsStruct : System monitoring information
+type SystemStatsStruct struct {
+	CPU struct {
+		Usage     float64 `json:"usage"`     // CPU usage percentage (0-100)
+		Cores     int     `json:"cores"`     // Number of CPU cores
+		Goroutines int    `json:"goroutines"` // Number of active goroutines
+	} `json:"cpu"`
+	
+	Memory struct {
+		Used      uint64  `json:"used"`      // Memory used in bytes
+		Total     uint64  `json:"total"`     // Total system memory in bytes
+		Usage     float64 `json:"usage"`     // Memory usage percentage (0-100)
+		Allocated uint64  `json:"allocated"` // Memory allocated by Go runtime in bytes
+		GCCycles  uint32  `json:"gcCycles"`  // Number of garbage collection cycles
+	} `json:"memory"`
+	
+	Network struct {
+		BytesReceived    uint64  `json:"bytesReceived"`    // Total bytes received
+		BytesSent        uint64  `json:"bytesSent"`        // Total bytes sent
+		PacketsReceived  uint64  `json:"packetsReceived"`  // Total packets received
+		PacketsSent      uint64  `json:"packetsSent"`      // Total packets sent
+		CurrentBandwidth float64 `json:"currentBandwidth"` // Current bandwidth usage in Mbps
+	} `json:"network"`
+	
+	Streams struct {
+		Active       int                  `json:"active"`       // Number of active streaming connections
+		Total        int                  `json:"total"`        // Total number of streams
+		Connections  []StreamConnection   `json:"connections"`  // Active stream connections
+		Bandwidth    float64              `json:"bandwidth"`    // Total streaming bandwidth in Mbps
+		BufferStatus []BufferStatusInfo   `json:"bufferStatus"` // Buffer status for active streams
+	} `json:"streams"`
+	
+	System struct {
+		Uptime        int64  `json:"uptime"`        // System uptime in seconds
+		StartTime     int64  `json:"startTime"`     // Process start time (Unix timestamp)
+		Version       string `json:"version"`       // Threadfin version
+		GoVersion     string `json:"goVersion"`     // Go runtime version
+		OS            string `json:"os"`            // Operating system
+		Architecture  string `json:"architecture"`  // System architecture
+	} `json:"system"`
+}
+
+// StreamConnection : Information about active streaming connection
+type StreamConnection struct {
+	ID           string  `json:"id"`           // Unique connection ID
+	ChannelName  string  `json:"channelName"`  // Channel being streamed
+	URL          string  `json:"url"`          // Stream URL
+	ClientIP     string  `json:"clientIP"`     // Client IP address
+	StartTime    int64   `json:"startTime"`    // Connection start time (Unix timestamp)
+	Bandwidth    float64 `json:"bandwidth"`    // Connection bandwidth in Mbps
+	Buffer       string  `json:"buffer"`       // Buffer type (ffmpeg, vlc, threadfin, -)
+	Status       string  `json:"status"`       // Connection status (active, buffering, error)
+	Error        string  `json:"error,omitempty"` // Error message if any
+}
+
+// BufferStatusInfo : Buffer status information
+type BufferStatusInfo struct {
+	StreamID     string  `json:"streamId"`     // Stream identifier
+	ChannelName  string  `json:"channelName"`  // Channel name
+	BufferType   string  `json:"bufferType"`   // Buffer type (ffmpeg, vlc, threadfin)
+	Status       string  `json:"status"`       // Buffer status (active, inactive, error)
+	Clients      int     `json:"clients"`      // Number of connected clients
+	Bandwidth    float64 `json:"bandwidth"`    // Buffer bandwidth usage in Mbps
+	Duration     float64 `json:"duration"`     // Buffer duration in seconds
+	ErrorMessage string  `json:"errorMessage,omitempty"` // Error message if any
 }
 
 // APIRequestStruct : Anfrage über die API Schnittstelle

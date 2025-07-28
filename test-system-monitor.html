@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>System Monitor Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.14.0/css/all.min.css">
+    <link rel="stylesheet" href="html/css/base.css">
+    <style>
+        body { margin: 20px; background: #333; color: white; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #666; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>System Monitor Test Page</h1>
+    
+    <div class="test-section">
+        <h3>System Monitor Bar</h3>
+        
+        <!-- System Monitor Bar -->
+        <div id="system-monitor-bar" class="system-monitor-container">
+            <div class="container-fluid">
+                <div class="row system-monitor-row">
+                    <div class="col-md-2 col-sm-6 col-6">
+                        <div class="monitor-item">
+                            <i class="fas fa-microchip"></i>
+                            <span class="monitor-label">CPU</span>
+                            <div class="progress-container">
+                                <div class="progress-bar" id="cpu-progress">
+                                    <div class="progress-fill" id="cpu-fill"></div>
+                                </div>
+                                <span class="monitor-value" id="cpu-value">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-6 col-6">
+                        <div class="monitor-item">
+                            <i class="fas fa-memory"></i>
+                            <span class="monitor-label">Memory</span>
+                            <div class="progress-container">
+                                <div class="progress-bar" id="memory-progress">
+                                    <div class="progress-fill" id="memory-fill"></div>
+                                </div>
+                                <span class="monitor-value" id="memory-value">0MB</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-6 col-6">
+                        <div class="monitor-item">
+                            <i class="fas fa-stream"></i>
+                            <span class="monitor-label">Streams</span>
+                            <div class="monitor-text">
+                                <span class="monitor-value" id="streams-value">0 / 0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-6 col-6">
+                        <div class="monitor-item">
+                            <i class="fas fa-network-wired"></i>
+                            <span class="monitor-label">Network</span>
+                            <div class="monitor-text">
+                                <span class="monitor-value" id="network-value">0 Mbps</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-6 col-6">
+                        <div class="monitor-item">
+                            <i class="fas fa-clock"></i>
+                            <span class="monitor-label">Uptime</span>
+                            <div class="monitor-text">
+                                <span class="monitor-value" id="uptime-value">0s</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-6 col-6">
+                        <div class="monitor-item">
+                            <i class="fas fa-info-circle"></i>
+                            <span class="monitor-label">Status</span>
+                            <div class="monitor-text">
+                                <span class="monitor-value status-indicator" id="status-value">●</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test Controls</h3>
+        <button class="btn btn-primary" onclick="testSystemMonitor()">Test with Mock Data</button>
+        <button class="btn btn-secondary" onclick="systemMonitor.toggleVisibility()">Toggle Visibility</button>
+        <button class="btn btn-info" onclick="showSystemStats()">Show Current Stats</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test Results</h3>
+        <pre id="test-results"></pre>
+    </div>
+
+    <script>
+        // Mock system monitor object for testing
+        var systemMonitor = {
+            interval: null,
+            isVisible: true,
+            
+            init: function() {
+                console.log('System monitor initialized');
+                this.startMonitoring();
+            },
+            
+            startMonitoring: function() {
+                if (this.interval) {
+                    clearInterval(this.interval);
+                }
+                
+                // Mock data updates every 2 seconds for testing
+                this.interval = setInterval(() => {
+                    this.updateWithMockData();
+                }, 2000);
+            },
+            
+            pauseMonitoring: function() {
+                if (this.interval) {
+                    clearInterval(this.interval);
+                    this.interval = null;
+                }
+            },
+            
+            resumeMonitoring: function() {
+                if (!this.interval && this.isVisible) {
+                    this.startMonitoring();
+                }
+            },
+            
+            updateWithMockData: function() {
+                var mockStats = {
+                    cpu: {
+                        usage: Math.random() * 100,
+                        cores: 4,
+                        goroutines: 15
+                    },
+                    memory: {
+                        used: Math.random() * 8000000000,  // 8GB
+                        total: 8000000000,
+                        usage: Math.random() * 80
+                    },
+                    network: {
+                        currentBandwidth: Math.random() * 100
+                    },
+                    streams: {
+                        active: Math.floor(Math.random() * 10),
+                        total: Math.floor(Math.random() * 50) + 10
+                    },
+                    system: {
+                        uptime: Math.floor(Math.random() * 86400) + 3600  // 1-24 hours
+                    }
+                };
+                
+                this.updateDisplay(mockStats);
+            },
+            
+            updateDisplay: function(stats) {
+                try {
+                    // Update CPU
+                    if (stats.cpu) {
+                        this.updateProgressBar('cpu', stats.cpu.usage, Math.round(stats.cpu.usage) + '%');
+                    }
+                    
+                    // Update Memory
+                    if (stats.memory) {
+                        var memoryMB = Math.round(stats.memory.used / (1024 * 1024));
+                        this.updateProgressBar('memory', stats.memory.usage, memoryMB + 'MB');
+                    }
+                    
+                    // Update Streams
+                    if (stats.streams) {
+                        var streamsText = stats.streams.active + ' / ' + stats.streams.total;
+                        this.updateText('streams', streamsText);
+                    }
+                    
+                    // Update Network
+                    if (stats.network) {
+                        var networkText = stats.network.currentBandwidth.toFixed(1) + ' Mbps';
+                        this.updateText('network', networkText);
+                    }
+                    
+                    // Update Uptime
+                    if (stats.system) {
+                        var uptimeText = this.formatUptime(stats.system.uptime);
+                        this.updateText('uptime', uptimeText);
+                    }
+                    
+                    // Update Status
+                    this.updateStatus(stats);
+                    
+                } catch (error) {
+                    console.error('Error updating system monitor display:', error);
+                }
+            },
+            
+            updateProgressBar: function(id, percentage, text) {
+                var fillElement = document.getElementById(id + '-fill');
+                var valueElement = document.getElementById(id + '-value');
+                
+                if (fillElement && valueElement) {
+                    // Update width
+                    fillElement.style.width = Math.min(percentage, 100) + '%';
+                    
+                    // Update color class based on percentage
+                    fillElement.className = 'progress-fill';
+                    if (percentage < 50) {
+                        fillElement.classList.add('low');
+                    } else if (percentage < 80) {
+                        fillElement.classList.add('medium');
+                    } else {
+                        fillElement.classList.add('high');
+                    }
+                    
+                    // Update text
+                    valueElement.textContent = text;
+                }
+            },
+            
+            updateText: function(id, text) {
+                var element = document.getElementById(id + '-value');
+                if (element) {
+                    element.textContent = text;
+                }
+            },
+            
+            updateStatus: function(stats) {
+                var statusElement = document.getElementById('status-value');
+                if (statusElement) {
+                    // Determine status based on system health
+                    var statusClass = '';
+                    
+                    if (stats.cpu && stats.cpu.usage > 90) {
+                        statusClass = 'error';
+                    } else if (stats.memory && stats.memory.usage > 90) {
+                        statusClass = 'error';
+                    } else if ((stats.cpu && stats.cpu.usage > 70) || (stats.memory && stats.memory.usage > 70)) {
+                        statusClass = 'warning';
+                    }
+                    
+                    // Update status indicator
+                    statusElement.className = 'monitor-value status-indicator ' + statusClass;
+                    statusElement.textContent = '●';
+                }
+            },
+            
+            formatUptime: function(seconds) {
+                if (seconds < 60) {
+                    return Math.floor(seconds) + 's';
+                } else if (seconds < 3600) {
+                    return Math.floor(seconds / 60) + 'm';
+                } else if (seconds < 86400) {
+                    var hours = Math.floor(seconds / 3600);
+                    var minutes = Math.floor((seconds % 3600) / 60);
+                    return hours + 'h' + (minutes > 0 ? ' ' + minutes + 'm' : '');
+                } else {
+                    var days = Math.floor(seconds / 86400);
+                    var hours = Math.floor((seconds % 86400) / 3600);
+                    return days + 'd' + (hours > 0 ? ' ' + hours + 'h' : '');
+                }
+            },
+            
+            toggleVisibility: function() {
+                var container = document.getElementById('system-monitor-bar');
+                if (container) {
+                    this.isVisible = !this.isVisible;
+                    container.style.display = this.isVisible ? 'block' : 'none';
+                    
+                    if (this.isVisible) {
+                        this.resumeMonitoring();
+                    } else {
+                        this.pauseMonitoring();
+                    }
+                }
+            }
+        };
+        
+        function testSystemMonitor() {
+            document.getElementById('test-results').textContent = 'Running system monitor test...';
+            systemMonitor.updateWithMockData();
+            document.getElementById('test-results').textContent = 'System monitor test completed. Check the monitor bar above.';
+        }
+        
+        function showSystemStats() {
+            var results = 'System Monitor State:\n';
+            results += 'Interval active: ' + (systemMonitor.interval !== null) + '\n';
+            results += 'Visible: ' + systemMonitor.isVisible + '\n';
+            results += 'CPU element exists: ' + (document.getElementById('cpu-fill') !== null) + '\n';
+            results += 'Memory element exists: ' + (document.getElementById('memory-fill') !== null) + '\n';
+            document.getElementById('test-results').textContent = results;
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            systemMonitor.init();
+        });
+    </script>
+</body>
+</html>

@@ -443,3 +443,198 @@ function setCookie(token) {
   document.cookie = "Token=" + token
 }
 
+// System Monitoring Functions
+var systemMonitor = {
+  interval: null,
+  isVisible: true,
+  
+  init: function() {
+    // Start monitoring when page loads
+    this.startMonitoring();
+    
+    // Add visibility change listener to pause/resume monitoring when tab is not active
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.pauseMonitoring();
+      } else {
+        this.resumeMonitoring();
+      }
+    });
+  },
+  
+  startMonitoring: function() {
+    if (this.interval) {
+      clearInterval(this.interval);
+    }
+    
+    // Get initial stats
+    this.getSystemStats();
+    
+    // Set up interval to update every 5 seconds
+    this.interval = setInterval(() => {
+      this.getSystemStats();
+    }, 5000);
+  },
+  
+  pauseMonitoring: function() {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+  },
+  
+  resumeMonitoring: function() {
+    if (!this.interval && this.isVisible) {
+      this.startMonitoring();
+    }
+  },
+  
+  getSystemStats: function() {
+    var data = {
+      cmd: "getSystemStats"
+    };
+    
+    // Use the existing Threadfin WebSocket function
+    if (typeof Threadfin === 'function') {
+      Threadfin(data);
+    }
+  },
+  
+  updateDisplay: function(stats) {
+    try {
+      // Update CPU
+      if (stats.cpu) {
+        this.updateProgressBar('cpu', stats.cpu.usage, stats.cpu.usage + '%');
+      }
+      
+      // Update Memory
+      if (stats.memory) {
+        var memoryMB = Math.round(stats.memory.used / (1024 * 1024));
+        var totalMB = Math.round(stats.memory.total / (1024 * 1024));
+        this.updateProgressBar('memory', stats.memory.usage, memoryMB + 'MB');
+      }
+      
+      // Update Streams
+      if (stats.streams) {
+        var streamsText = stats.streams.active + ' / ' + stats.streams.total;
+        this.updateText('streams', streamsText);
+      }
+      
+      // Update Network
+      if (stats.network) {
+        var networkText = stats.network.currentBandwidth.toFixed(1) + ' Mbps';
+        this.updateText('network', networkText);
+      }
+      
+      // Update Uptime
+      if (stats.system) {
+        var uptimeText = this.formatUptime(stats.system.uptime);
+        this.updateText('uptime', uptimeText);
+      }
+      
+      // Update Status
+      this.updateStatus(stats);
+      
+    } catch (error) {
+      console.error('Error updating system monitor display:', error);
+    }
+  },
+  
+  updateProgressBar: function(id, percentage, text) {
+    var fillElement = document.getElementById(id + '-fill');
+    var valueElement = document.getElementById(id + '-value');
+    
+    if (fillElement && valueElement) {
+      // Update width
+      fillElement.style.width = Math.min(percentage, 100) + '%';
+      
+      // Update color class based on percentage
+      fillElement.className = 'progress-fill';
+      if (percentage < 50) {
+        fillElement.classList.add('low');
+      } else if (percentage < 80) {
+        fillElement.classList.add('medium');
+      } else {
+        fillElement.classList.add('high');
+      }
+      
+      // Update text
+      valueElement.textContent = text;
+    }
+  },
+  
+  updateText: function(id, text) {
+    var element = document.getElementById(id + '-value');
+    if (element) {
+      element.textContent = text;
+    }
+  },
+  
+  updateStatus: function(stats) {
+    var statusElement = document.getElementById('status-value');
+    if (statusElement) {
+      // Determine status based on system health
+      var isHealthy = true;
+      var statusClass = '';
+      
+      if (stats.cpu && stats.cpu.usage > 90) {
+        isHealthy = false;
+        statusClass = 'error';
+      } else if (stats.memory && stats.memory.usage > 90) {
+        isHealthy = false;
+        statusClass = 'error';
+      } else if ((stats.cpu && stats.cpu.usage > 70) || (stats.memory && stats.memory.usage > 70)) {
+        statusClass = 'warning';
+      }
+      
+      // Update status indicator
+      statusElement.className = 'monitor-value status-indicator ' + statusClass;
+      statusElement.textContent = '●';
+    }
+  },
+  
+  formatUptime: function(seconds) {
+    if (seconds < 60) {
+      return Math.floor(seconds) + 's';
+    } else if (seconds < 3600) {
+      return Math.floor(seconds / 60) + 'm';
+    } else if (seconds < 86400) {
+      var hours = Math.floor(seconds / 3600);
+      var minutes = Math.floor((seconds % 3600) / 60);
+      return hours + 'h' + (minutes > 0 ? ' ' + minutes + 'm' : '');
+    } else {
+      var days = Math.floor(seconds / 86400);
+      var hours = Math.floor((seconds % 86400) / 3600);
+      return days + 'd' + (hours > 0 ? ' ' + hours + 'h' : '');
+    }
+  },
+  
+  toggleVisibility: function() {
+    var container = document.getElementById('system-monitor-bar');
+    if (container) {
+      this.isVisible = !this.isVisible;
+      container.style.display = this.isVisible ? 'block' : 'none';
+      
+      if (this.isVisible) {
+        this.resumeMonitoring();
+      } else {
+        this.pauseMonitoring();
+      }
+    }
+  }
+};
+
+// Initialize system monitoring when page loads
+document.addEventListener('DOMContentLoaded', function() {
+  systemMonitor.init();
+});
+
+// Also initialize if DOMContentLoaded has already fired
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    systemMonitor.init();
+  });
+} else {
+  systemMonitor.init();
+}
+

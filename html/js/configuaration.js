@@ -234,6 +234,13 @@ function Threadfin(data) {
       createClintInfo(response["clientInfo"]);
     }
 
+    // Handle system stats updates
+    if (response.hasOwnProperty("systemStats")) {
+      if (typeof systemMonitor !== 'undefined' && typeof systemMonitor.updateDisplay === 'function') {
+        systemMonitor.updateDisplay(response["systemStats"]);
+      }
+    }
+
     if (response.hasOwnProperty("status")) {
       if (response["status"] == false) {
         document.getElementById("headline").style.borderColor = "red";

@@ -311,5 +311,8 @@ func StartSystem(updateProviderFiles bool) (err error) {
 
 	buildXEPG(true)
 
+	// Initialize system monitoring
+	InitSystemMonitoring()
+
 	return
 }

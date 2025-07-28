@@ -248,6 +248,13 @@ function Threadfin(data) {
       createClintInfo(response["log"]);
     }
 
+    // Handle system stats updates
+    if (response.hasOwnProperty("systemStats")) {
+      if (typeof systemMonitor !== 'undefined' && typeof systemMonitor.updateDisplay === 'function') {
+        systemMonitor.updateDisplay(response["systemStats"]);
+      }
+    }
+
     if (response.hasOwnProperty("status")) {
       if (response["status"] == false) {
         showNotification(response["err"], "error", 10000);

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -233,6 +234,14 @@ func Stream(w http.ResponseWriter, r *http.Request) {
 		showInfo("Streaming Info:URL was passed to the client.")
 		showInfo("Streaming Info:Threadfin is no longer involved, the client connects directly to the streaming server.")
 	default:
+		// Register streaming connection for monitoring
+		connectionID := fmt.Sprintf("stream_%s_%d", path, time.Now().UnixNano())
+		clientIP := getClientIP(r)
+		RegisterStreamConnection(connectionID, streamInfo.Name, streamInfo.URL, clientIP, playListBuffer)
+		
+		// Defer unregistration of the connection
+		defer UnregisterStreamConnection(connectionID)
+		
 		bufferingStream(streamInfo.PlaylistID, streamInfo.URL, streamInfo.BackupChannel1, streamInfo.BackupChannel2, streamInfo.BackupChannel3, streamInfo.Name, w, r)
 	}
 	return
@@ -422,7 +431,7 @@ func WS(w http.ResponseWriter, r *http.Request) {
 
 	// Generate a unique connection ID for tracking
 	connID := fmt.Sprintf("conn_%d", time.Now().UnixNano())
-	showDebug("WebSocket: New connection established: "+connID, 2)
+	showDebug("WebSocket: Connection "+connID+" established", 3)
 
 	systemMutex.Lock()
 	if Settings.HttpThreadfinDomain != "" {
@@ -443,11 +452,10 @@ func WS(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Only log detailed request info for non-updateLog requests to reduce noise
-		if request.Cmd != "updateLog" {
-			showDebug("WebSocket: Connection "+connID+" received request with command: "+request.Cmd, 2)
-			showDebug("WebSocket: Connection "+connID+" request JSON: "+mapToJSON(request), 3)
-			showDebug("WebSocket: Connection "+connID+" checking authentication...", 3)
+		// Only log important requests to reduce noise
+		if request.Cmd != "updateLog" && request.Cmd != "getServerConfig" {
+			showInfo("WebSocket: " + request.Cmd)
+			showDebug("WebSocket: Connection "+connID+" processing: "+request.Cmd, 3)
 		}
 
 		systemMutex.Lock()
@@ -457,7 +465,7 @@ func WS(w http.ResponseWriter, r *http.Request) {
 
 			// Token Authentication
 			case true:
-				showInfo("WebSocket:" + "Connection " + connID + " token authentication enabled")
+				showDebug("WebSocket: Token auth for "+connID, 3)
 
 				var token string
 				tokens, ok := r.URL.Query()["Token"]
@@ -493,7 +501,7 @@ func WS(w http.ResponseWriter, r *http.Request) {
 
 			case false:
 				if request.Cmd != "updateLog" {
-					showDebug("WebSocket: Connection "+connID+" no authentication required", 3)
+					// No authentication required - continue silently
 				}
 
 			}
@@ -707,6 +715,10 @@ func WS(w http.ResponseWriter, r *http.Request) {
 			resolution, frameRate, audioChannels, _ := probeChannel(request)
 			response.ProbeInfo = ProbeInfoStruct{Resolution: resolution, FrameRate: frameRate, AudioChannel: audioChannels}
 
+		case "getSystemStats":
+			showDebug("WebSocket: Getting system statistics for "+connID, 3)
+			response.SystemStats = GetSystemStats()
+
 		default:
 			fmt.Println("+ + + + + + + + + + +", request.Cmd)
 		}
@@ -722,20 +734,17 @@ func WS(w http.ResponseWriter, r *http.Request) {
 			response.ConfigurationWizard = System.ConfigurationWizard
 		}
 
-		showInfo("WebSocket:" + "Connection " + connID + " sending response back to client")
 		// Reset write deadline before sending response
 		conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 		if err = conn.WriteJSON(response); err != nil {
 			ShowError(err, 1022)
-			showInfo("WebSocket:" + "Connection " + connID + " failed to send response: " + err.Error())
 		} else {
-			showInfo("WebSocket:" + "Connection " + connID + " response sent successfully")
-			// Reduced delay to prevent UI hanging - background processing handles long operations
-			if request.Cmd == "updateFileM3U" || request.Cmd == "updateFileXMLTV" || request.Cmd == "updateFileHDHR" {
-				time.Sleep(200 * time.Millisecond) // Reduced from 2000ms
-			} else {
-				time.Sleep(100 * time.Millisecond) // Reduced from 500ms
+			// Only log important responses, not routine ones
+			if request.Cmd != "updateLog" && request.Cmd != "getServerConfig" {
+				showDebug("WebSocket: Response sent for "+request.Cmd, 3)
 			}
+			// Minimal delay to ensure response delivery
+			time.Sleep(50 * time.Millisecond)
 			break
 		}
 
@@ -1350,4 +1359,33 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// getClientIP : Extract client IP address from HTTP request
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header first (for proxies)
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		// X-Forwarded-For can contain multiple IPs, take the first one
+		ips := strings.Split(forwarded, ",")
+		return strings.TrimSpace(ips[0])
+	}
+	
+	// Check X-Real-IP header (common proxy header)
+	realIP := r.Header.Get("X-Real-IP")
+	if realIP != "" {
+		return realIP
+	}
+	
+	// Fall back to remote address
+	ip := r.RemoteAddr
+	if strings.Contains(ip, ":") {
+		// Remove port number if present
+		host, _, err := net.SplitHostPort(ip)
+		if err == nil {
+			return host
+		}
+	}
+	
+	return ip
 }
