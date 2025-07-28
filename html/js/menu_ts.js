@@ -110,9 +110,8 @@ class Content {
         return element;
     }
     createTableContent(menuKey) {
-        var content = new Array();
-        var data;
-
+        var data = new Object();
+        var rows = new Array();
         switch (menuKey) {
             case "playlist":
                 var fileTypes = new Array("m3u", "hdhr");
@@ -173,7 +172,7 @@ class Content {
                         cell.childType = "P";
                         cell.value = data[key]["compatibility"]["stream.id"];
                         tr.appendChild(cell.createCell());
-                        content.push(tr);
+                        rows.push(tr);
                     });
                 });
                 break;
@@ -214,7 +213,7 @@ class Content {
                     cell.childType = "P";
                     cell.value = data[key]["filter"];
                     tr.appendChild(cell.createCell());
-                    content.push(tr);
+                    rows.push(tr);
                 });
                 break;
             case "xmltv":
@@ -251,7 +250,7 @@ class Content {
                         cell.childType = "P";
                         cell.value = data[key]["compatibility"]["xmltv.programs"];
                         tr.appendChild(cell.createCell());
-                        content.push(tr);
+                        rows.push(tr);
                     });
                 });
                 break;
@@ -324,28 +323,16 @@ class Content {
                             cell.value = "-";
                         }
                         tr.appendChild(cell.createCell());
-                        content.push(tr);
+                        rows.push(tr);
                     });
                 });
-
                 break;
             case "mapping":
-                console.log("DEBUG: SERVER in createTableContent:", SERVER);
-                console.log("DEBUG: SERVER.xepg in createTableContent:", SERVER ? SERVER.xepg : undefined);
-                
-                if (!SERVER || !SERVER["xepg"]) {
-                    console.warn("Server or xepg data not initialized yet");
-                    return content;
-                }
-                
                 BULK_EDIT = false;
                 createSearchObj();
                 checkUndo("epgMapping");
                 console.log("MAPPING");
-                
-                data = SERVER["xepg"]["epgMapping"] || {};
-                console.log("DEBUG: epgMapping data:", data);
-                
+                data = SERVER["xepg"]["epgMapping"];
                 var keys = getObjKeys(data);
                 keys.forEach(key => {
                     if (data[key]["x-active"]) {
@@ -441,7 +428,7 @@ class Content {
                         td.setAttribute('onclick', 'javascript: openPopUp("mapping", this)');
                         td.id = key;
                         tr.appendChild(td);
-                        content.push(tr);
+                        rows.push(tr);
                     }
                 });
                 break;
@@ -452,98 +439,130 @@ class Content {
                 console.log("Table content (menuKey):", menuKey);
                 break;
         }
-        return content;
+        return rows;
     }
     createInactiveTableContent(menuKey) {
-        var content = new Array();
-        var data;
-
+        var data = new Object();
+        var rows = new Array();
         switch (menuKey) {
             case "mapping":
-                if (!SERVER || !SERVER["xepg"]) {
-                    console.warn("Server or xepg data not initialized yet");
-                    return content;
-                }
+                BULK_EDIT = false;
+                createSearchObj();
+                checkUndo("epgMapping");
                 console.log("MAPPING");
-                
-                data = SERVER["xepg"]["epgMapping"] || {};
+                data = SERVER["xepg"]["epgMapping"];
                 var keys = getObjKeys(data);
-
                 keys.forEach(key => {
-                    if (data[key]["x-active"] == false) {
+                    if (data[key]["x-active"] === false) {
                         var tr = document.createElement("TR");
-                        tr.setAttribute("id", key);
+                        tr.id = key;
                         tr.className = "notActiveEPG";
-
                         // Bulk
-                        var td = document.createElement("TD");
-                        var input = document.createElement("INPUT");
-                        input.setAttribute("type", "checkbox");
-                        input.className = "bulk hideBulk";
-                        td.appendChild(input);
-                        tr.appendChild(td);
-
-                        // Channel number
-                        var td = document.createElement("TD");
-                        var input = document.createElement("INPUT");
-                        input.setAttribute("type", "text");
-                        input.className = "channelNumber";
-                        input.setAttribute("onchange", "javascript: changeChannelNumber(this)");
-                        input.value = data[key]["x-channelID"];
-                        td.appendChild(input);
-                        tr.appendChild(td);
-
-                        // Channel icon
-                        var td = document.createElement("TD");
-                        var img = document.createElement("IMG");
-                        img.setAttribute("src", data[key]["tvg-logo"]);
-                        td.appendChild(img);
-                        tr.appendChild(td);
-
-                        // Channel name
-                        var td = document.createElement("TD");
-                        var p = document.createElement("P");
-                        p.innerHTML = data[key]["x-name"];
-                        td.appendChild(p);
-                        tr.appendChild(td);
-
-                        // M3U file
-                        var td = document.createElement("TD");
-                        var p = document.createElement("P");
-                        p.innerHTML = data[key]["_file.m3u.name"];
-                        td.appendChild(p);
-                        tr.appendChild(td);
-
-                        // Group title
-                        var td = document.createElement("TD");
-                        var p = document.createElement("P");
-                        p.innerHTML = data[key]["x-group-title"];
-                        td.appendChild(p);
-                        tr.appendChild(td);
-
-                        // XMLTV file
-                        var td = document.createElement("TD");
-                        var p = document.createElement("P");
-                        p.innerHTML = data[key]["x-xmltv-file"];
-                        td.appendChild(p);
-                        tr.appendChild(td);
-
-                        // Channel settings
-                        var td = document.createElement("TD");
-                        td.setAttribute("onclick", 'javascript: openPopUp("mapping", this)');
-                        td.setAttribute('data-bs-toggle', 'modal');
-                        td.setAttribute('data-bs-target', '#popup');
-                        td.className = "pointer";
+                        var cell = new Cell();
+                        cell.child = true;
+                        cell.childType = "BULK";
+                        cell.value = false;
+                        tr.appendChild(cell.createCell());
+                        // Kanalnummer
+                        var cell = new Cell();
+                        cell.child = true;
+                        cell.childType = "INPUTCHANNEL";
+                        if (data[key]["x-active"] == true) {
+                            cell.value = data[key]["x-channelID"];
+                        }
+                        else {
+                            cell.value = data[key]["x-channelID"] * 10;
+                        }
+                        //td.setAttribute('onclick', 'javascript: changeChannelNumber("' + key + '", this)')
+                        tr.appendChild(cell.createCell());
+                        // Logo
+                        var cell = new Cell();
+                        cell.child = true;
+                        cell.childType = "IMG";
+                        cell.imageURL = data[key]["tvg-logo"];
+                        var td = cell.createCell();
+                        td.setAttribute('onclick', 'javascript: openPopUp("mapping", this)');
+                        td.className = "logo-cell";
                         td.id = key;
                         tr.appendChild(td);
-
-                        content.push(tr);
+                        // Kanalname
+                        var cell = new Cell();
+                        var cats = data[key]["x-category"].split(":");
+                        cell.child = true;
+                        cell.childType = "P";
+                        cell.className = "category";
+                        var catColorSettings = SERVER["settings"]["epgCategoriesColors"];
+                        var colors_split = catColorSettings.split("|");
+                        for (var i = 0; i < colors_split.length; i++) {
+                            var catsColor_split = colors_split[i].split(":");
+                            if (catsColor_split[0] == cats[0]) {
+                                cell.classColor = catsColor_split[1];
+                            }
+                        }
+                        cell.value = data[key]["x-name"];
+                        var td = cell.createCell();
+                        td.setAttribute('onclick', 'javascript: openPopUp("mapping", this)');
+                        td.id = key;
+                        tr.appendChild(td);
+                        // Playlist
+                        var cell = new Cell();
+                        cell.child = true;
+                        cell.childType = "P";
+                        //cell.value = data[key]["_file.m3u.name"] 
+                        cell.value = getValueFromProviderFile(data[key]["_file.m3u.id"], "m3u", "name");
+                        var td = cell.createCell();
+                        td.setAttribute('onclick', 'javascript: openPopUp("mapping", this)');
+                        td.id = key;
+                        tr.appendChild(td);
+                        // Gruppe (group-title)
+                        var cell = new Cell();
+                        cell.child = true;
+                        cell.childType = "P";
+                        cell.value = data[key]["x-group-title"];
+                        var td = cell.createCell();
+                        td.setAttribute('onclick', 'javascript: openPopUp("mapping", this)');
+                        td.id = key;
+                        tr.appendChild(td);
+                        // XMLTV Datei
+                        var cell = new Cell();
+                        cell.child = true;
+                        cell.childType = "P";
+                        if (data[key]["x-xmltv-file"] != "-") {
+                            cell.value = getValueFromProviderFile(data[key]["x-xmltv-file"], "xmltv", "name");
+                        }
+                        else {
+                            cell.value = data[key]["x-xmltv-file"];
+                        }
+                        var td = cell.createCell();
+                        td.setAttribute('onclick', 'javascript: openPopUp("mapping", this)');
+                        td.id = key;
+                        tr.appendChild(td);
+                        // XMLTV Kanal
+                        var cell = new Cell();
+                        cell.child = true;
+                        cell.childType = "P";
+                        //var value = str.substring(1, 4);
+                        var value = data[key]["x-mapping"];
+                        if (value.length > 20) {
+                            value = data[key]["x-mapping"].substring(0, 20) + "...";
+                        }
+                        cell.value = value;
+                        var td = cell.createCell();
+                        td.setAttribute('onclick', 'javascript: openPopUp("mapping", this)');
+                        td.id = key;
+                        tr.appendChild(td);
+                        rows.push(tr);
                     }
                 });
                 break;
+            case "settings":
+                alert();
+                break;
+            default:
+                console.log("Table content (menuKey):", menuKey);
+                break;
         }
-
-        return content;
+        return rows;
     }
 }
 class Cell {
@@ -630,44 +649,28 @@ class ShowContent extends Content {
     }
     show() {
         COLUMN_TO_SORT = -1;
-        // Clear old content
+        // Alten Inhalt löschen
         var doc = document.getElementById(this.DocumentID);
-        if (!doc) {
-            console.warn("Document element not found");
-            return;
-        }
         doc.innerHTML = "";
         showPreview(false);
-
-        // Headline
+        // Überschrift
         var popup_header = document.getElementById(this.HeaderID);
-        if (!popup_header || !menuItems || !menuItems[this.menuID]) {
-            console.warn("Required elements or menu data not found");
-            return;
-        }
-
         var headline = menuItems[this.menuID].headline;
         var menuKey = menuItems[this.menuID].menuKey;
         var h = this.createHeadline(headline);
         var existingHeader = popup_header.querySelector('h3');
         if (existingHeader) {
             popup_header.replaceChild(h, existingHeader);
-        } else {
+        }
+        else {
             popup_header.appendChild(h);
         }
-
         var hr = this.createHR();
         doc.appendChild(hr);
-
-        // Interaction
+        // Interaktion
         var div = this.createInteraction();
         doc.appendChild(div);
         var interaction = document.getElementById(this.interactionID);
-        if (!interaction) {
-            console.warn("Interaction element not found");
-            return;
-        }
-
         switch (menuKey) {
             case "playlist":
                 var input = this.createInput("button", menuKey, "{{.button.new}}");
@@ -677,7 +680,6 @@ class ShowContent extends Content {
                 input.setAttribute('data-bs-target', '#popup');
                 interaction.appendChild(input);
                 break;
-
             case "filter":
                 var input = this.createInput("button", menuKey, "{{.button.new}}");
                 input.setAttribute("id", -1);
@@ -686,7 +688,6 @@ class ShowContent extends Content {
                 input.setAttribute('data-bs-target', '#popup');
                 interaction.appendChild(input);
                 break;
-
             case "xmltv":
                 var input = this.createInput("button", menuKey, "{{.button.new}}");
                 input.setAttribute("id", "xmltv");
@@ -695,7 +696,6 @@ class ShowContent extends Content {
                 input.setAttribute('data-bs-target', '#popup');
                 interaction.appendChild(input);
                 break;
-
             case "users":
                 var input = this.createInput("button", menuKey, "{{.button.new}}");
                 input.setAttribute("id", "users");
@@ -704,100 +704,82 @@ class ShowContent extends Content {
                 input.setAttribute('data-bs-target', '#popup');
                 interaction.appendChild(input);
                 break;
-
             case "mapping":
+                // showElement("loading", true)
                 var input = this.createInput("button", menuKey, "{{.button.save}}");
                 input.setAttribute("onclick", 'javascript: savePopupData("mapping", "", "")');
                 interaction.appendChild(input);
-
-                input = this.createInput("button", menuKey, "{{.button.bulkEdit}}");
+                var input = this.createInput("button", menuKey, "{{.button.bulkEdit}}");
                 input.setAttribute("onclick", 'javascript: bulkEdit()');
                 interaction.appendChild(input);
-
-                input = this.createInput("search", "search", "");
+                var input = this.createInput("search", "search", "");
                 input.setAttribute("id", "searchMapping");
                 input.setAttribute("placeholder", "{{.button.search}}");
                 input.className = "search";
                 input.setAttribute("onchange", 'javascript: searchInMapping()');
                 interaction.appendChild(input);
                 break;
-
             case "settings":
                 var input = this.createInput("button", menuKey, "{{.button.save}}");
-                input.setAttribute("onclick", 'javascript: saveSettingsWithFeedback(this);');
-                input.setAttribute("class", "save-button");
-                input.setAttribute("id", "settings-save-btn");
+                input.setAttribute("onclick", 'javascript: saveSettings();');
                 interaction.appendChild(input);
-
-                input = this.createInput("button", menuKey, "{{.button.backup}}");
+                var input = this.createInput("button", menuKey, "{{.button.backup}}");
                 input.setAttribute("onclick", 'javascript: backup();');
                 interaction.appendChild(input);
-
-                input = this.createInput("button", menuKey, "{{.button.restore}}");
+                var input = this.createInput("button", menuKey, "{{.button.restore}}");
                 input.setAttribute("onclick", 'javascript: restore();');
                 interaction.appendChild(input);
-
                 var wrapper = document.createElement("DIV");
                 wrapper.setAttribute("id", "box-wrapper");
                 doc.appendChild(wrapper);
-
                 this.DivID = "content_settings";
                 var settings = this.createDIV();
                 wrapper.appendChild(settings);
                 showSettings();
                 return;
-
+                break;
             case "log":
                 var input = this.createInput("button", menuKey, "{{.button.resetLogs}}");
                 input.setAttribute("onclick", 'javascript: resetLogs();');
                 interaction.appendChild(input);
-
                 var wrapper = document.createElement("DIV");
                 wrapper.setAttribute("id", "box-wrapper");
                 doc.appendChild(wrapper);
-
                 this.DivID = "content_log";
                 var logs = this.createDIV();
                 wrapper.appendChild(logs);
                 showLogs(true);
                 return;
-
+                break;
             case "logout":
                 location.reload();
                 document.cookie = "Token= ; expires = Thu, 01 Jan 1970 00:00:00 GMT";
                 break;
-
             default:
                 console.log("Show content (menuKey):", menuKey);
                 break;
         }
-
         // Create table (if needed)
         var tableHeader = menuItems[this.menuID].tableHeader;
-        if (tableHeader && tableHeader.length > 0) {
+        if (tableHeader.length > 0) {
             var wrapper = document.createElement("DIV");
             doc.appendChild(wrapper);
             wrapper.setAttribute("id", "box-wrapper");
-
             var table = this.createTABLE();
             wrapper.appendChild(table);
-
             var header = this.createTableRow();
             table.appendChild(header);
-
             // Table header
             tableHeader.forEach(element => {
                 var cell = new Cell();
                 cell.child = true;
                 cell.childType = "P";
                 cell.value = element;
-
                 if (element == "BULK") {
                     cell.childType = "BULK_HEAD";
                     cell.active = true;
                     cell.value = false;
                 }
-
                 if (menuKey == "mapping") {
                     if (element == "{{.mapping.table.chNo}}") {
                         cell.onclick = true;
@@ -817,44 +799,33 @@ class ShowContent extends Content {
                         cell.onclickFunktion = "javascript: sortTable(5);";
                     }
                 }
-
                 header.appendChild(cell.createCell());
             });
-
             table.appendChild(header);
-
-            // Table content
+            // Inhalt der Tabelle
             var rows = this.createTableContent(menuKey);
-            if (rows && Array.isArray(rows)) {
-                rows.forEach(tr => {
-                    table.appendChild(tr);
-                });
-            }
-
+            rows.forEach(tr => {
+                table.appendChild(tr);
+            });
             var br = this.createBR();
             doc.appendChild(br);
-
             // Create inactive channels for mapping
             if (menuKey == "mapping") {
                 var inactivetable = this.createInactiveTABLE();
                 wrapper.appendChild(inactivetable);
-
                 var header = this.createInactiveTableRow();
                 inactivetable.appendChild(header);
-
-                // Table header
+                // Kopfzeile der Tablle
                 tableHeader.forEach(element => {
                     var cell = new Cell();
                     cell.child = true;
                     cell.childType = "P";
                     cell.value = element;
-
                     if (element == "BULK") {
                         cell.childType = "BULK_HEAD";
                         cell.active = false;
                         cell.value = false;
                     }
-
                     if (menuKey == "mapping") {
                         if (element == "{{.mapping.table.chNo}}") {
                             cell.onclick = true;
@@ -874,22 +845,16 @@ class ShowContent extends Content {
                             cell.onclickFunktion = "javascript: sortTable(5, 'inactive_content_table');";
                         }
                     }
-
                     header.appendChild(cell.createCell());
                 });
-
                 inactivetable.appendChild(header);
-
-                // Table content
+                // Inhalt der Tabelle
                 var rows = this.createInactiveTableContent(menuKey);
-                if (rows && Array.isArray(rows)) {
-                    rows.forEach(tr => {
-                        inactivetable.appendChild(tr);
-                    });
-                }
+                rows.forEach(tr => {
+                    inactivetable.appendChild(tr);
+                });
             }
         }
-
         switch (menuKey) {
             case "mapping":
                 sortTable(1);
@@ -904,7 +869,6 @@ class ShowContent extends Content {
                 sortTable(0);
                 break;
         }
-
         showElement("loading", false);
     }
 }

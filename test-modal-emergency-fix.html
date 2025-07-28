@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Emergency Modal Fix Verification</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .result { margin: 10px 0; padding: 10px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button { margin: 5px; padding: 10px 15px; }
+        #output { background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🚨 Emergency Modal Fix Verification</h1>
+    <p><strong>Testing unified modal system to resolve dual system conflict</strong></p>
+    
+    <div class="test-section">
+        <h3>1. Unified Modal System Test</h3>
+        <button onclick="testUnifiedModalSystem()">Run Unified Modal Test</button>
+        <div id="unifiedResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Legacy Function Redirect Test</h3>
+        <button onclick="testLegacyRedirect()">Test Legacy Redirect</button>
+        <div id="legacyResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. Bootstrap Modal State Test</h3>
+        <button onclick="testBootstrapState()">Check Bootstrap State</button>
+        <div id="bootstrapResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>4. Data.js Functions Test</h3>
+        <button onclick="testDataJsFunctions()">Test Data.js Functions</button>
+        <div id="dataJsResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test Output Console</h3>
+        <div id="output"></div>
+        <button onclick="clearOutput()">Clear Output</button>
+    </div>
+
+    <script>
+        function log(message) {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.innerHTML += `[${timestamp}] ${message}<br>`;
+            output.scrollTop = output.scrollHeight;
+            console.log(message);
+        }
+
+        function setResult(elementId, message, isSuccess) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = message;
+            element.className = 'result ' + (isSuccess ? 'success' : 'error');
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+        }
+
+        // Test 1: Unified Modal System
+        function testUnifiedModalSystem() {
+            log("=== TESTING UNIFIED MODAL SYSTEM ===");
+            
+            try {
+                // Check if we're in the Threadfin environment
+                const targetOrigin = 'http://localhost:34400';
+                const iframe = document.createElement('iframe');
+                iframe.src = targetOrigin + '/web/';
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+                
+                iframe.onload = function() {
+                    try {
+                        const threadfinWindow = iframe.contentWindow;
+                        
+                        log("Testing showElementSafe function...");
+                        
+                        // Test show
+                        log("Showing modal...");
+                        threadfinWindow.showElementSafe("loading", true);
+                        
+                        // Test hide after 3 seconds
+                        setTimeout(() => {
+                            log("Hiding modal...");
+                            threadfinWindow.showElementSafe("loading", false);
+                            
+                            // Verify it actually disappeared
+                            setTimeout(() => {
+                                const loading = threadfinWindow.document.getElementById("loading");
+                                if (!loading) {
+                                    log("❌ Loading element not found");
+                                    setResult('unifiedResult', 'Loading element not found', false);
+                                    return;
+                                }
+                                
+                                const isVisible = loading.classList.contains('show') || 
+                                               loading.style.display !== 'none';
+                                log(`Modal visible after hide: ${isVisible}`);
+                                log(`Expected: false, Actual: ${isVisible}`);
+                                
+                                if (!isVisible) {
+                                    log("✅ MODAL SYSTEM WORKING!");
+                                    setResult('unifiedResult', 'Unified modal system working correctly!', true);
+                                } else {
+                                    log("❌ MODAL STILL STUCK");
+                                    setResult('unifiedResult', 'Modal system still has issues', false);
+                                }
+                            }, 1000);
+                        }, 3000);
+                        
+                    } catch (e) {
+                        log(`Cross-origin error: ${e.message}`);
+                        setResult('unifiedResult', 'Cross-origin restriction - test manually in browser console', false);
+                    }
+                };
+                
+            } catch (e) {
+                log(`Error: ${e.message}`);
+                setResult('unifiedResult', `Error: ${e.message}`, false);
+            }
+        }
+
+        // Test 2: Legacy Function Redirect
+        function testLegacyRedirect() {
+            log("=== TESTING LEGACY REDIRECT ===");
+            setResult('legacyResult', 'Run manually in Threadfin browser console', false);
+            
+            const testScript = `
+// Test legacy function redirect
+console.log("=== TESTING LEGACY REDIRECT ===");
+if (typeof showLoadingScreen === 'function') {
+    showLoadingScreen(true);   // Should show modal
+    setTimeout(() => {
+        showLoadingScreen(false); // Should hide modal
+        console.log("Legacy redirect test complete");
+    }, 2000);
+} else {
+    console.log("showLoadingScreen function not found");
+}`;
+            
+            log("Copy and run this script in Threadfin browser console:");
+            log(testScript);
+        }
+
+        // Test 3: Bootstrap Modal State
+        function testBootstrapState() {
+            log("=== TESTING BOOTSTRAP STATE ===");
+            setResult('bootstrapResult', 'Run manually in Threadfin browser console', false);
+            
+            const testScript = `
+// Check Bootstrap modal state consistency
+var loading = document.getElementById("loading");
+if (loading) {
+    var instance = bootstrap.Modal.getInstance(loading);
+    console.log("Bootstrap instance exists:", !!instance);
+    console.log("Modal classes:", loading.className);
+    console.log("Bootstrap state:", instance ? instance._isShown : "no instance");
+} else {
+    console.log("Loading element not found");
+}`;
+            
+            log("Copy and run this script in Threadfin browser console:");
+            log(testScript);
+        }
+
+        // Test 4: Data.js Functions
+        function testDataJsFunctions() {
+            log("=== TESTING DATA.JS FUNCTIONS ===");
+            setResult('dataJsResult', 'Check browser console for function verification', false);
+            
+            const testScript = `
+// Test data.js functions that were updated
+console.log("=== CHECKING DATA.JS FUNCTION UPDATES ===");
+
+// Check if showElementSafe is available
+if (typeof showElementSafe === 'function') {
+    console.log("✅ showElementSafe function available");
+    
+    // Test the function
+    console.log("Testing showElementSafe...");
+    showElementSafe("loading", true);
+    setTimeout(() => {
+        showElementSafe("loading", false);
+        console.log("✅ showElementSafe test completed");
+    }, 1500);
+} else {
+    console.log("❌ showElementSafe function not found");
+}
+
+// Check if legacy redirect works
+if (typeof showLoadingScreen === 'function') {
+    console.log("✅ showLoadingScreen function available (should redirect)");
+} else {
+    console.log("❌ showLoadingScreen function not found");
+}`;
+            
+            log("Copy and run this script in Threadfin browser console:");
+            log(testScript);
+        }
+
+        // Auto-start basic information gathering
+        window.onload = function() {
+            log("Emergency Modal Fix Verification Tool Loaded");
+            log("Navigate to http://localhost:34400/web/ and open browser console");
+            log("Then run the tests above or copy the provided scripts");
+        };
+    </script>
+</body>
+</html>

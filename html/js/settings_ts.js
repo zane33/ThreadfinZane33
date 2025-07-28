@@ -14,6 +14,18 @@ class SettingsCategory {
     createSettings(settingsKey) {
         var setting = document.createElement("TR");
         var content = new PopupContent();
+        // Defensive programming: Check for null/undefined SERVER or settings data
+        if (!SERVER || !SERVER["settings"] || SERVER["settings"][settingsKey] === undefined || SERVER["settings"][settingsKey] === null) {
+            console.warn("Settings data not available for key:", settingsKey);
+            // Return empty setting row to prevent crash, will be updated when data loads
+            var tdLeft = document.createElement("TD");
+            tdLeft.innerHTML = "Loading...";
+            var tdRight = document.createElement("TD");
+            tdRight.innerHTML = "Settings data loading...";
+            setting.appendChild(tdLeft);
+            setting.appendChild(tdRight);
+            return setting;
+        }
         var data = SERVER["settings"][settingsKey];
         switch (settingsKey) {
             // Texteingaben
@@ -655,110 +667,210 @@ class SettingsCategoryItem extends SettingsCategory {
 }
 function showSettings() {
     console.log("SETTINGS");
-    for (let i = 0; i < settingsCategory.length; i++) {
-        settingsCategory[i].createCategory();
+    // Defensive check for SERVER data before rendering settings
+    if (!SERVER || !SERVER["settings"]) {
+        console.warn("SERVER settings data not available, delaying settings display");
+        // Clear any existing content and show loading message
+        var contentElement = document.getElementById("content_settings");
+        if (contentElement) {
+            contentElement.innerHTML = "<p>Loading settings...</p>";
+        }
+        return;
+    }
+    try {
+        for (let i = 0; i < settingsCategory.length; i++) {
+            settingsCategory[i].createCategory();
+        }
+    }
+    catch (error) {
+        console.error("Error rendering settings:", error);
+        var contentElement = document.getElementById("content_settings");
+        if (contentElement) {
+            contentElement.innerHTML = "<p class='text-danger'>Error loading settings. Please refresh the page.</p>";
+        }
     }
 }
 function saveSettings() {
     console.log("Save Settings");
-    
-    // Show loading immediately
-    showElement("loading", true);
-    
-    // Check if there are any changes to save
-    var div = document.getElementById("content_settings");
-    var settings = div.getElementsByClassName("changed");
-    
-    if (settings.length === 0) {
-        showElement("loading", false);
-        if (typeof showNotification === 'function') {
-            showNotification("No changes to save.", "info", 2000);
+    try {
+        // Don't show loading immediately - let the Server class handle it
+        // This prevents double loading states
+        // Check if there are any changes to save
+        var cmd = "saveSettings";
+        var div = document.getElementById("content_settings");
+        if (!div) {
+            console.error("Settings content div not found");
+            alert("Error: Settings interface not found. Please refresh the page.");
+            return;
         }
-        return;
-    }
-    
-    var cmd = "saveSettings";
-    var newSettings = new Object();
-    
-    for (let i = 0; i < settings.length; i++) {
-        var name;
-        var value;
-        switch (settings[i].tagName) {
-            case "INPUT":
-                switch (settings[i].type) {
-                    case "checkbox":
-                        name = settings[i].name;
-                        value = settings[i].checked;
-                        newSettings[name] = value;
-                        break;
-                    case "text":
-                        name = settings[i].name;
-                        value = settings[i].value;
-                        switch (name) {
-                            case "update":
-                                value = value.split(",");
-                                value = value.filter(function (e) { return e; });
-                                break;
-                            case "buffer.timeout":
-                                value = parseFloat(value);
-                        }
-                        newSettings[name] = value;
-                        break;
-                }
-                break;
-            case "SELECT":
-                name = settings[i].name;
-                value = settings[i].value;
-                // Wenn der Wert eine Zahl ist, wird dieser als Zahl gespeichert
-                if (isNaN(value)) {
-                    newSettings[name] = value;
-                }
-                else {
-                    newSettings[name] = parseInt(value);
-                }
-                break;
+        var settings = div.getElementsByClassName("changed");
+        if (settings.length === 0) {
+            console.log("No changes to save");
+            return;
         }
+        var newSettings = new Object();
+        for (let i = 0; i < settings.length; i++) {
+            var name;
+            var value;
+            switch (settings[i].tagName) {
+                case "INPUT":
+                    switch (settings[i].type) {
+                        case "checkbox":
+                            name = settings[i].name;
+                            value = settings[i].checked;
+                            newSettings[name] = value;
+                            break;
+                        case "text":
+                            name = settings[i].name;
+                            value = settings[i].value;
+                            switch (name) {
+                                case "update":
+                                    value = value.split(",");
+                                    value = value.filter(function (e) { return e; });
+                                    break;
+                                case "buffer.timeout":
+                                    value = parseFloat(value);
+                            }
+                            newSettings[name] = value;
+                            break;
+                    }
+                    break;
+                case "SELECT":
+                    name = settings[i].name;
+                    value = settings[i].value;
+                    // Wenn der Wert eine Zahl ist, wird dieser als Zahl gespeichert
+                    if (isNaN(value)) {
+                        newSettings[name] = value;
+                    }
+                    else {
+                        newSettings[name] = parseInt(value);
+                    }
+                    break;
+            }
+        }
+        var data = new Object();
+        data["settings"] = newSettings;
+        var server = new Server(cmd);
+        server.request(data);
     }
-    
-    // Show what's being saved in console for debugging
-    console.log("Saving settings:", newSettings);
-    
-    var data = new Object();
-    data["settings"] = newSettings;
-    var server = new Server(cmd);
-    server.request(data);
+    catch (error) {
+        console.error("Error saving settings:", error);
+        showElementSafe("loading", false);
+        alert("Error saving settings: " + error.message + ". Please try again or refresh the page.");
+    }
 }
-
 // Enhanced save function with visual feedback
 function saveSettingsWithFeedback(button) {
-    // Get all changed elements before starting save
-    var div = document.getElementById("content_settings");
-    var settings = div.getElementsByClassName("changed");
-    
-    if (settings.length === 0) {
-        if (typeof showNotification === 'function') {
-            showNotification("No changes to save.", "info", 2000);
+    try {
+        // Get all changed elements before starting save
+        var div = document.getElementById("content_settings");
+        if (!div) {
+            showSettingsFeedback("error", "Settings interface not found. Please refresh the page.");
+            return;
         }
-        return;
+        var settings = div.getElementsByClassName("changed");
+        if (settings.length === 0) {
+            showSettingsFeedback("info", "No changes to save");
+            return;
+        }
+        // Prevent multiple simultaneous saves
+        if (button && button.disabled) {
+            console.log("Save already in progress");
+            return;
+        }
+        // Disable the save button and show loading state
+        if (button) {
+            button.disabled = true;
+            button.classList.add("saving");
+            var originalText = button.value;
+            button.value = "Saving...";
+            // Store original text for restoration
+            button.setAttribute("data-original-text", originalText);
+        }
+        // Add saving class to all changed elements
+        for (var i = 0; i < settings.length; i++) {
+            settings[i].classList.add("saving");
+        }
+        // Call the original save function
+        // The response will be handled by the WebSocket response handler in network_ts.ts
+        saveSettings();
     }
-    
-    // Disable the save button and show loading state
-    if (button) {
-        button.disabled = true;
-        button.classList.add("saving");
-        var originalText = button.value;
-        button.value = "Saving...";
-        
-        // Store original text for restoration
-        button.setAttribute("data-original-text", originalText);
+    catch (error) {
+        console.error("Error in saveSettingsWithFeedback:", error);
+        if (button) {
+            button.disabled = false;
+            button.classList.remove("saving");
+            var originalText = button.getAttribute("data-original-text");
+            if (originalText) {
+                button.value = originalText;
+            }
+        }
+        showSettingsFeedback("error", "Error preparing to save settings: " + error.message);
     }
-    
-    // Add saving class to all changed elements
-    for (var i = 0; i < settings.length; i++) {
-        settings[i].classList.add("saving");
+}
+// Function to provide user feedback for settings operations
+function showSettingsFeedback(type, message, duration = 3000) {
+    try {
+        // Create a simple feedback div if it doesn't exist
+        var feedbackId = "settings-feedback";
+        var existingFeedback = document.getElementById(feedbackId);
+        if (existingFeedback) {
+            existingFeedback.remove();
+        }
+        var feedback = document.createElement("div");
+        feedback.id = feedbackId;
+        feedback.style.position = "fixed";
+        feedback.style.top = "20px";
+        feedback.style.right = "20px";
+        feedback.style.padding = "12px 20px";
+        feedback.style.borderRadius = "4px";
+        feedback.style.zIndex = "9999";
+        feedback.style.maxWidth = "300px";
+        feedback.style.fontSize = "14px";
+        feedback.style.fontWeight = "bold";
+        feedback.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+        feedback.style.opacity = "0";
+        feedback.style.transition = "opacity 0.3s ease";
+        switch (type) {
+            case "success":
+                feedback.style.backgroundColor = "#d4edda";
+                feedback.style.color = "#155724";
+                feedback.style.border = "1px solid #c3e6cb";
+                break;
+            case "error":
+                feedback.style.backgroundColor = "#f8d7da";
+                feedback.style.color = "#721c24";
+                feedback.style.border = "1px solid #f5c6cb";
+                break;
+            case "warning":
+                feedback.style.backgroundColor = "#fff3cd";
+                feedback.style.color = "#856404";
+                feedback.style.border = "1px solid #ffeaa7";
+                break;
+            default:
+                feedback.style.backgroundColor = "#d1ecf1";
+                feedback.style.color = "#0c5460";
+                feedback.style.border = "1px solid #bee5eb";
+        }
+        feedback.innerHTML = message;
+        document.body.appendChild(feedback);
+        // Fade in
+        setTimeout(function () {
+            feedback.style.opacity = "1";
+        }, 100);
+        // Fade out and remove after duration
+        setTimeout(function () {
+            feedback.style.opacity = "0";
+            setTimeout(function () {
+                if (feedback.parentNode) {
+                    feedback.parentNode.removeChild(feedback);
+                }
+            }, 300);
+        }, duration);
     }
-    
-    // Call the original save function
-    // The response will be handled by the WebSocket response handler in network_ts.js
-    saveSettings();
+    catch (error) {
+        console.error("Error showing settings feedback:", error);
+        // Fallback to alert if custom feedback fails
+        alert(type.toUpperCase() + ": " + message);
+    }
 }

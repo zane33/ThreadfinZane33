@@ -6,6 +6,40 @@ var SEARCH_MAPPING = new Object();
 var UNDO = new Object();
 var SERVER_CONNECTION = false;
 var WS_AVAILABLE = false;
+var LOADING_ERROR_STATE = false;
+// Global error handler to prevent UI crashes
+window.addEventListener('error', function (e) {
+    console.error('Global error caught:', e.error);
+    console.error('Error details:', e.filename, e.lineno, e.colno, e.message);
+    // Hide loading modal on any error to prevent stuck state
+    try {
+        if (document.getElementById("loading") && document.getElementById("loading").classList.contains('show')) {
+            console.warn("Hiding loading modal due to JavaScript error");
+            showElementSafe("loading", false);
+        }
+    }
+    catch (loadingError) {
+        console.warn("Failed to hide loading on global error:", loadingError);
+        forceCleanLoadingState();
+    }
+    // Don't prevent default behavior, just log and clean up
+    return false;
+});
+// Global promise rejection handler
+window.addEventListener('unhandledrejection', function (e) {
+    console.error('Unhandled promise rejection:', e.reason);
+    // Hide loading modal on promise rejection to prevent stuck state
+    try {
+        if (document.getElementById("loading") && document.getElementById("loading").classList.contains('show')) {
+            console.warn("Hiding loading modal due to promise rejection");
+            showElementSafe("loading", false);
+        }
+    }
+    catch (loadingError) {
+        console.warn("Failed to hide loading on promise rejection:", loadingError);
+        forceCleanLoadingState();
+    }
+});
 const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
 const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 // new ClipboardJS('.copy-btn');
@@ -63,27 +97,48 @@ function showElement(elmID, type) {
     if (elmID == "loading") {
         switch (type) {
             case true:
-                console.log("DEBUG: Showing loading modal");
+                // Reduce console noise for loading operations
+                if (window.location.search.includes('debug=true')) {
+                    console.log("DEBUG: Showing loading modal");
+                }
                 try {
+                    // Clear any existing error states
+                    clearLoadingError();
                     // Ensure we're not already showing
                     var loadingElement = document.getElementById("loading");
                     if (!loadingElement.classList.contains('show')) {
                         loadingModal.show();
+                        // Set timeout to force hide after 30 seconds to prevent stuck modal
+                        setTimeout(function () {
+                            if (loadingElement && loadingElement.classList.contains('show')) {
+                                console.warn("DEBUG: Force hiding stuck loading modal after timeout");
+                                showElementSafe("loading", false);
+                            }
+                        }, 30000);
                     }
-                } catch (error) {
+                }
+                catch (error) {
                     console.error("Error showing loading modal:", error);
+                    setLoadingError("Failed to show loading screen");
                 }
                 break;
             case false:
-                console.log("DEBUG: Hiding loading modal");
+                // Reduce console noise for loading operations
+                if (window.location.search.includes('debug=true')) {
+                    console.log("DEBUG: Hiding loading modal");
+                }
                 try {
+                    // Clear any loading error state
+                    clearLoadingError();
                     var loadingElement = document.getElementById("loading");
+                    if (!loadingElement) {
+                        console.warn("DEBUG: Loading element not found");
+                        return;
+                    }
                     console.log("DEBUG: Loading element classes:", loadingElement.className);
                     console.log("DEBUG: Loading element style display:", loadingElement.style.display);
-                    
-                    // Try multiple methods to hide the modal
+                    // Enhanced modal hiding with better error handling
                     var hidden = false;
-                    
                     // Method 1: Use Bootstrap modal instance
                     try {
                         if (loadingModal && typeof loadingModal.hide === 'function') {
@@ -91,10 +146,11 @@ function showElement(elmID, type) {
                             console.log("DEBUG: Called loadingModal.hide()");
                             hidden = true;
                         }
-                    } catch (e) {
-                        console.warn("DEBUG: loadingModal.hide() failed:", e);
                     }
-                    
+                    catch (e) {
+                        console.warn("DEBUG: loadingModal.hide() failed:", e);
+                        setLoadingError("Failed to hide loading modal via Bootstrap instance");
+                    }
                     // Method 2: Try to get fresh Bootstrap instance
                     if (!hidden) {
                         try {
@@ -104,13 +160,14 @@ function showElement(elmID, type) {
                                 console.log("DEBUG: Called bootstrap.Modal.getInstance().hide()");
                                 hidden = true;
                             }
-                        } catch (e) {
+                        }
+                        catch (e) {
                             console.warn("DEBUG: Bootstrap getInstance failed:", e);
+                            setLoadingError("Failed to get Bootstrap modal instance");
                         }
                     }
-                    
-                    // Method 3: Force hide with direct DOM manipulation
-                    if (!hidden) {
+                    // Method 3: Force hide with direct DOM manipulation - ALWAYS run this as backup
+                    try {
                         console.log("DEBUG: Force hiding modal with DOM manipulation");
                         loadingElement.classList.remove('show');
                         loadingElement.style.display = 'none';
@@ -119,31 +176,70 @@ function showElement(elmID, type) {
                         document.body.classList.remove('modal-open');
                         document.body.style.overflow = '';
                         document.body.style.paddingRight = '';
+                        // Force clean up all modal classes and states
+                        loadingElement.classList.remove('fade', 'show');
+                        console.log("DEBUG: DOM manipulation complete");
                     }
-                    
-                    // Always cleanup after a short delay
-                    setTimeout(function() {
-                        // Remove modal backdrop elements
+                    catch (domError) {
+                        console.error("DEBUG: DOM manipulation failed:", domError);
+                        setLoadingError("Critical error: Could not hide loading modal");
+                    }
+                    // Enhanced cleanup of backdrops and body styles
+                    try {
                         var backdrops = document.querySelectorAll('.modal-backdrop');
                         console.log("DEBUG: Found", backdrops.length, "backdrop(s) to remove");
-                        backdrops.forEach(function(backdrop) {
-                            if (backdrop.parentNode) {
-                                backdrop.parentNode.removeChild(backdrop);
+                        backdrops.forEach(function (backdrop, index) {
+                            try {
+                                if (backdrop.parentNode) {
+                                    backdrop.parentNode.removeChild(backdrop);
+                                    console.log("DEBUG: Removed backdrop", index + 1);
+                                }
+                            }
+                            catch (backdropError) {
+                                console.warn("DEBUG: Error removing backdrop", index + 1, ":", backdropError);
                             }
                         });
                         // Ensure body classes are cleaned up
                         document.body.classList.remove('modal-open');
                         document.body.style.paddingRight = '';
                         document.body.style.overflow = '';
-                    }, 100);
-                } catch (e) {
-                    console.warn("Error hiding loading modal:", e);
-                    // Fallback: force hide the modal element
-                    var loadingElement = document.getElementById("loading");
-                    if (loadingElement) {
-                        loadingElement.style.display = 'none';
-                        loadingElement.classList.remove('show');
+                        document.body.style.position = '';
                     }
+                    catch (cleanupError) {
+                        console.warn("DEBUG: Error during immediate cleanup:", cleanupError);
+                        setLoadingError("Warning: Cleanup incomplete");
+                    }
+                    // Multiple delayed cleanup attempts for robustness
+                    var cleanupAttempts = [100, 500, 1000];
+                    cleanupAttempts.forEach(function (delay) {
+                        setTimeout(function () {
+                            try {
+                                var remainingBackdrops = document.querySelectorAll('.modal-backdrop');
+                                if (remainingBackdrops.length > 0) {
+                                    console.log("DEBUG: Delayed cleanup at", delay + "ms - removing", remainingBackdrops.length, "remaining backdrop(s)");
+                                    remainingBackdrops.forEach(function (backdrop) {
+                                        if (backdrop.parentNode) {
+                                            backdrop.parentNode.removeChild(backdrop);
+                                        }
+                                    });
+                                }
+                                // Final body cleanup
+                                document.body.classList.remove('modal-open');
+                                document.body.style.paddingRight = '';
+                                document.body.style.overflow = '';
+                                document.body.style.position = '';
+                            }
+                            catch (delayedCleanupError) {
+                                console.warn("DEBUG: Error during delayed cleanup at", delay + "ms:", delayedCleanupError);
+                            }
+                        }, delay);
+                    });
+                }
+                catch (e) {
+                    console.error("Error hiding loading modal:", e);
+                    setLoadingError("Critical error hiding loading modal: " + e.message);
+                    // Last resort - force everything clean
+                    forceCleanLoadingState();
                 }
                 break;
         }
@@ -356,37 +452,43 @@ function createSearchObj() {
     SEARCH_MAPPING = new Object();
     // Safety check to ensure SERVER data is loaded
     if (!SERVER || !SERVER["xepg"] || !SERVER["xepg"]["epgMapping"]) {
-        console.log("DEBUG: SERVER data not ready yet, skipping search object creation");
+        // Reduce console noise for expected condition
         return;
     }
-    var data = SERVER["xepg"]["epgMapping"];
-    var channels = getObjKeys(data);
-    var channelKeys = ["x-active", "x-channelID", "x-name", "_file.m3u.name", "x-group-title", "x-xmltv-file"];
-    channels.forEach(id => {
-        channelKeys.forEach(key => {
-            if (key == "x-active") {
-                switch (data[id][key]) {
-                    case true:
-                        SEARCH_MAPPING[id] = "online ";
-                        break;
-                    case false:
-                        SEARCH_MAPPING[id] = "offline ";
-                        break;
-                }
-            }
-            else {
-                if (key == "x-xmltv-file") {
-                    var xmltvFile = getValueFromProviderFile(data[id][key], "xmltv", "name");
-                    if (xmltvFile != undefined) {
-                        SEARCH_MAPPING[id] = SEARCH_MAPPING[id] + xmltvFile + " ";
+    try {
+        var data = SERVER["xepg"]["epgMapping"];
+        var channels = getObjKeys(data);
+        var channelKeys = ["x-active", "x-channelID", "x-name", "_file.m3u.name", "x-group-title", "x-xmltv-file"];
+        channels.forEach(id => {
+            channelKeys.forEach(key => {
+                if (key == "x-active") {
+                    switch (data[id][key]) {
+                        case true:
+                            SEARCH_MAPPING[id] = "online ";
+                            break;
+                        case false:
+                            SEARCH_MAPPING[id] = "offline ";
+                            break;
                     }
                 }
                 else {
-                    SEARCH_MAPPING[id] = SEARCH_MAPPING[id] + data[id][key] + " ";
+                    if (key == "x-xmltv-file") {
+                        var xmltvFile = getValueFromProviderFile(data[id][key], "xmltv", "name");
+                        if (xmltvFile != undefined) {
+                            SEARCH_MAPPING[id] = SEARCH_MAPPING[id] + xmltvFile + " ";
+                        }
+                    }
+                    else {
+                        SEARCH_MAPPING[id] = SEARCH_MAPPING[id] + data[id][key] + " ";
+                    }
                 }
-            }
+            });
         });
-    });
+    }
+    catch (error) {
+        console.error("Error creating search object:", error);
+        SEARCH_MAPPING = new Object(); // Reset to empty object on error
+    }
     return;
 }
 function enableGroupSelection(selector) {
@@ -622,19 +724,15 @@ function probeChannel(url) {
     return;
 }
 function checkUndo(key) {
-    if (!SERVER || !SERVER["xepg"]) {
-        console.warn("Server or xepg data not initialized yet");
-        return;
-    }
-
     switch (key) {
         case "epgMapping":
             if (UNDO.hasOwnProperty(key)) {
-                if (SERVER["xepg"][key] !== undefined) {
+                if (SERVER && SERVER["xepg"] && SERVER["xepg"][key] !== undefined) {
                     SERVER["xepg"][key] = JSON.parse(JSON.stringify(UNDO[key]));
                 }
-            } else {
-                if (SERVER["xepg"][key] !== undefined) {
+            }
+            else {
+                if (SERVER && SERVER["xepg"] && SERVER["xepg"][key] !== undefined) {
                     UNDO[key] = JSON.parse(JSON.stringify(SERVER["xepg"][key]));
                 }
             }
@@ -662,25 +760,67 @@ function sortSelect(elem) {
     return;
 }
 function updateLog() {
-    console.log("TOKEN");
+    // Reduce console noise - remove constant TOKEN logging
     var server = new Server("updateLog");
     server.request(new Object());
 }
-
-// Function to refresh server data when needed
-function refreshServerData() {
-    console.log("Refreshing server data...");
-    var server = new Server("getServerConfig");
-    server.request(new Object());
+// Loading modal error handling utilities
+function setLoadingError(message) {
+    LOADING_ERROR_STATE = true;
+    console.error("Loading Modal Error:", message);
 }
-
-// Function to check if data is stale and refresh if needed
-function checkAndRefreshData() {
-    // Check if SERVER object exists and has basic required properties
-    if (!SERVER || !SERVER.hasOwnProperty("settings") || !SERVER.hasOwnProperty("info")) {
-        console.log("DEBUG: Server data appears stale or missing, refreshing...");
-        refreshServerData();
-        return true;
+function clearLoadingError() {
+    LOADING_ERROR_STATE = false;
+}
+function isLoadingInErrorState() {
+    return LOADING_ERROR_STATE;
+}
+function forceCleanLoadingState() {
+    console.warn("DEBUG: Force cleaning all loading state");
+    try {
+        // Force remove all modal-related classes from body
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+        document.body.style.position = '';
+        // Force hide loading element
+        var loadingElement = document.getElementById("loading");
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+            loadingElement.classList.remove('show', 'fade');
+            loadingElement.setAttribute('aria-hidden', 'true');
+            loadingElement.removeAttribute('aria-modal');
+        }
+        // Force remove all backdrops
+        var allBackdrops = document.querySelectorAll('.modal-backdrop');
+        allBackdrops.forEach(function (backdrop) {
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        });
+        console.log("DEBUG: Force clean complete");
     }
-    return false;
+    catch (error) {
+        console.error("DEBUG: Force clean failed:", error);
+    }
+}
+// Enhanced showElement with error recovery
+function showElementSafe(elmID, type, retryCount = 0) {
+    try {
+        showElement(elmID, type);
+    }
+    catch (error) {
+        console.error("Error in showElementSafe:", error);
+        if (elmID === "loading" && !type && retryCount < 3) {
+            console.log("DEBUG: Retrying loading modal hide, attempt", retryCount + 1);
+            setTimeout(function () {
+                showElementSafe(elmID, type, retryCount + 1);
+            }, 1000);
+        }
+        else if (elmID === "loading" && !type) {
+            // Final fallback for stuck loading modal
+            console.warn("DEBUG: All retry attempts failed, force cleaning");
+            forceCleanLoadingState();
+        }
+    }
 }

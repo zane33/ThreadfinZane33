@@ -218,7 +218,7 @@ function Threadfin(data) {
     return;
   } else {
     if (data["cmd"] != "getLog") {
-      showLoadingScreen(true)
+      showElementSafe("loading", true)
     }
   }
   delete undo["epgMapping"];
@@ -257,7 +257,7 @@ function Threadfin(data) {
         //checkErr(response)
         console.log(response);
         updateThreadfinStatus(response);
-        setTimeout(function () { showLoadingScreen(false); }, 300);
+        setTimeout(function () { showElementSafe("loading", false); }, 300);
 
         return
       }
@@ -288,7 +288,7 @@ function Threadfin(data) {
       document.getElementById(10).click()
     }
 
-    setTimeout(function () { showLoadingScreen(false); }, 0);
+    setTimeout(function () { showElementSafe("loading", false); }, 0);
   }
 
 }

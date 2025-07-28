@@ -1,26 +1,32 @@
 version: '3.8'
 
 services:
-  threadfin:
-    image: threadfinzane33:emergency-fix
-    container_name: threadfin
-    restart: unless-stopped
+  threadfin-emergency-test:
+    image: threadfinzane33:latest
+    container_name: threadfin-emergency-test
+    restart: "no"
     
     ports:
-      - "34400:34400"
+      - "34401:34400"
     
     volumes:
       - threadfin_conf:/home/threadfin/conf
       - threadfin_temp:/tmp/threadfin
       - threadfin_cache:/home/threadfin/cache
       - threadfin_logs:/var/log
+      # Mount local files for emergency testing
+      - ./html:/home/threadfin/html:ro
     
     environment:
       - THREADFIN_PORT=34400
       - THREADFIN_BIND_IP_ADDRESS=0.0.0.0
-      - THREADFIN_DEBUG=0
+      - THREADFIN_DEBUG=3
       - THREADFIN_BRANCH=main
       - TZ=Pacific/Auckland
+      # Enable development mode to use local files
+      - THREADFIN_DEV=true
+    
+    command: ["/home/threadfin/bin/threadfin", "-dev", "-debug", "3"]
 
 volumes:
   threadfin_conf:
@@ -30,4 +36,4 @@ volumes:
   threadfin_cache:
     driver: local
   threadfin_logs:
-    driver: local 
+    driver: local

@@ -219,16 +219,26 @@ function showScreenLog() {
   }
 }
 
-function showLoadingScreen(elm) {
-  var div = document.getElementById("loading");
-  switch (elm) {
-    case true: div.className = "block"; break;
-    case false: div.className = "none"; break;
-
-    /*
-    case true: div.style.display = "block"; break;
-    case false: div.style.display = "none"; break;
-    */
+function showLoadingScreen(show) {
+  console.log("Legacy showLoadingScreen redirected to modern system");
+  // Redirect to modern Bootstrap-compatible system to prevent conflicts
+  if (typeof showElementSafe === 'function') {
+    showElementSafe("loading", show);
+  } else if (typeof showElement === 'function') {
+    showElement("loading", show);
+  } else {
+    // Fallback for cases where modern system isn't available
+    console.warn("Modern modal system not available, using basic fallback");
+    var div = document.getElementById("loading");
+    if (div) {
+      if (show) {
+        div.style.display = "block";
+        div.classList.add("show");
+      } else {
+        div.style.display = "none";
+        div.classList.remove("show");
+      }
+    }
   }
 }
 

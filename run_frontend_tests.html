@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Threadfin Frontend Test Runner</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .iframe-container { margin: 20px 0; border: 1px solid #ddd; }
+        #testFrame { width: 100%; height: 600px; border: none; }
+        .log { background: #000; color: #0f0; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; }
+        .controls { margin: 20px 0; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Threadfin Frontend Test Runner</h1>
+        <p>This tool tests the critical fixes implemented for loading screen issues.</p>
+        
+        <div class="status info">
+            <strong>Test Target:</strong> http://localhost:34400/web/<br>
+            <strong>Testing:</strong> Settings save operations, WebSocket stability, loading modal management, error handling
+        </div>
+        
+        <div class="controls">
+            <button class="btn-primary" onclick="loadThreadfin()">Load Threadfin Interface</button>
+            <button class="btn-success" onclick="runTests()">Run Frontend Tests</button>
+            <button class="btn-secondary" onclick="navigateToSettings()">Navigate to Settings</button>
+            <button class="btn-danger" onclick="testLoadingModal()">Test Loading Modal</button>
+        </div>
+        
+        <div id="status" class="status info">
+            <strong>Status:</strong> Ready to begin testing. Click "Load Threadfin Interface" to start.
+        </div>
+        
+        <div class="iframe-container">
+            <iframe id="testFrame" src="about:blank"></iframe>
+        </div>
+        
+        <div>
+            <h3>Test Results Log:</h3>
+            <div id="testLog" class="log">
+Waiting for tests to run...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const testFrame = document.getElementById('testFrame');
+        const statusDiv = document.getElementById('status');
+        const testLog = document.getElementById('testLog');
+        
+        let testResults = null;
+        
+        function updateStatus(message, type = 'info') {
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = `<strong>Status:</strong> ${message}`;
+        }
+        
+        function logMessage(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            testLog.innerHTML += `[${timestamp}] ${message}\n`;
+            testLog.scrollTop = testLog.scrollHeight;
+        }
+        
+        function loadThreadfin() {
+            updateStatus('Loading Threadfin web interface...', 'info');
+            testFrame.src = 'http://localhost:34400/web/';
+            
+            testFrame.onload = function() {
+                updateStatus('Threadfin interface loaded successfully!', 'success');
+                logMessage('✅ Threadfin web interface loaded');
+                
+                // Wait a moment for full initialization
+                setTimeout(() => {
+                    updateStatus('Interface ready. You can now run tests or navigate manually.', 'success');
+                }, 2000);
+            };
+            
+            testFrame.onerror = function() {
+                updateStatus('Failed to load Threadfin interface. Is it running on localhost:34400?', 'error');
+                logMessage('❌ Failed to load Threadfin interface');
+            };
+        }
+        
+        function runTests() {
+            if (testFrame.src === 'about:blank' || !testFrame.src.includes('localhost:34400')) {
+                updateStatus('Please load Threadfin interface first!', 'error');
+                return;
+            }
+            
+            updateStatus('Running comprehensive frontend tests...', 'info');
+            logMessage('🧪 Starting frontend test suite...');
+            
+            try {
+                // Inject and run the test script
+                const testScript = `
+                    // Inject test script into the frame
+                    const script = document.createElement('script');
+                    script.textContent = \`${getTestScript()}\`;
+                    document.head.appendChild(script);
+                `;
+                
+                testFrame.contentWindow.eval(testScript);
+                
+                // Set up result monitoring
+                setTimeout(() => {
+                    monitorTestResults();
+                }, 1000);
+                
+            } catch (error) {
+                updateStatus('Error running tests: ' + error.message, 'error');
+                logMessage('❌ Test execution error: ' + error.message);
+            }
+        }
+        
+        function navigateToSettings() {
+            if (!testFrame.contentWindow) {
+                updateStatus('Please load Threadfin interface first!', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('Navigating to Settings page...', 'info');
+                logMessage('⚙️ Attempting to navigate to Settings...');
+                
+                // Try to find and click settings link
+                const settingsLink = testFrame.contentDocument.querySelector('#settings') || 
+                                   testFrame.contentDocument.querySelector('a[href*="settings"]') ||
+                                   testFrame.contentDocument.querySelector('[data-menu="settings"]');
+                
+                if (settingsLink) {
+                    settingsLink.click();
+                    updateStatus('Navigated to Settings page', 'success');
+                    logMessage('✅ Settings page navigation successful');
+                } else {
+                    updateStatus('Could not find Settings navigation element', 'error');
+                    logMessage('❌ Settings navigation element not found');
+                }
+            } catch (error) {
+                updateStatus('Error navigating to settings: ' + error.message, 'error');
+                logMessage('❌ Settings navigation error: ' + error.message);
+            }
+        }
+        
+        function testLoadingModal() {
+            if (!testFrame.contentWindow) {
+                updateStatus('Please load Threadfin interface first!', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('Testing loading modal behavior...', 'info');
+                logMessage('⏳ Testing loading modal show/hide...');
+                
+                const testCode = `
+                    if (typeof showElementSafe === 'function') {
+                        console.log('Testing loading modal...');
+                        showElementSafe('loading', true);
+                        setTimeout(() => {
+                            showElementSafe('loading', false);
+                            console.log('Loading modal test complete');
+                        }, 2000);
+                    } else {
+                        console.error('showElementSafe function not available');
+                    }
+                `;
+                
+                testFrame.contentWindow.eval(testCode);
+                updateStatus('Loading modal test executed', 'success');
+                logMessage('✅ Loading modal test completed');
+                
+            } catch (error) {
+                updateStatus('Error testing loading modal: ' + error.message, 'error');
+                logMessage('❌ Loading modal test error: ' + error.message);
+            }
+        }
+        
+        function monitorTestResults() {
+            try {
+                const frameWindow = testFrame.contentWindow;
+                if (frameWindow && frameWindow.testResults) {
+                    testResults = frameWindow.testResults;
+                    displayTestResults(testResults);
+                } else {
+                    // Try again in a moment
+                    setTimeout(monitorTestResults, 2000);
+                }
+            } catch (error) {
+                logMessage('❌ Error monitoring test results: ' + error.message);
+            }
+        }
+        
+        function displayTestResults(results) {
+            if (!results) return;
+            
+            const passRate = Math.round((results.passed / (results.passed + results.failed)) * 100);
+            
+            if (results.failed === 0) {
+                updateStatus(`All tests passed! (${results.passed}/${results.passed + results.failed}) - ${passRate}%`, 'success');
+            } else {
+                updateStatus(`Tests completed with ${results.failed} failures (${results.passed}/${results.passed + results.failed}) - ${passRate}%`, 'error');
+            }
+            
+            logMessage(`📊 Test Summary: ${results.passed} passed, ${results.failed} failed`);
+            
+            if (results.tests) {
+                results.tests.forEach(test => {
+                    const icon = test.passed ? '✅' : '❌';
+                    const message = test.message ? ` - ${test.message}` : '';
+                    logMessage(`${icon} ${test.testName}${message}`);
+                });
+            }
+            
+            if (results.errors && results.errors.length > 0) {
+                logMessage('🚨 Errors encountered:');
+                results.errors.forEach(error => {
+                    logMessage(`  • ${error.test}: ${error.error}`);
+                });
+            }
+        }
+        
+        function getTestScript() {
+            // Return the test script content (this would be the actual test file content)
+            return \`
+                // Simplified test version for iframe execution
+                console.log("=== THREADFIN FRONTEND TESTING (IFRAME) ===");
+                
+                const testResults = { passed: 0, failed: 0, tests: [], errors: [] };
+                
+                function logTest(testName, passed, message = '') {
+                    const result = { testName, passed, message, timestamp: new Date().toISOString() };
+                    testResults.tests.push(result);
+                    
+                    if (passed) {
+                        testResults.passed++;
+                        console.log(\`✅ PASS: \${testName}\${message ? ' - ' + message : ''}\`);
+                    } else {
+                        testResults.failed++;
+                        console.log(\`❌ FAIL: \${testName}\${message ? ' - ' + message : ''}\`);
+                    }
+                }
+                
+                // Run basic tests
+                try {
+                    // Test 1: Critical functions exist
+                    logTest("showElement function exists", typeof showElement === 'function');
+                    logTest("showElementSafe function exists", typeof showElementSafe === 'function');
+                    logTest("forceCleanLoadingState function exists", typeof forceCleanLoadingState === 'function');
+                    logTest("saveSettings function exists", typeof saveSettings === 'function');
+                    logTest("saveSettingsWithFeedback function exists", typeof saveSettingsWithFeedback === 'function');
+                    
+                    // Test 2: WebSocket manager
+                    logTest("WebSocketManager class exists", typeof WebSocketManager === 'function');
+                    
+                    // Test 3: Server class
+                    logTest("Server class exists", typeof Server === 'function');
+                    
+                    // Test 4: DOM elements
+                    logTest("Loading modal element exists", !!document.getElementById('loading'));
+                    
+                    // Test 5: Global variables
+                    logTest("SERVER object available", typeof SERVER !== 'undefined');
+                    
+                    console.log(\`\\n📊 Results: \${testResults.passed} passed, \${testResults.failed} failed\`);
+                    
+                    // Make results available to parent
+                    window.testResults = testResults;
+                    
+                } catch (error) {
+                    console.error("Test execution error:", error);
+                    testResults.errors.push({ test: 'execution', error: error.message });
+                    window.testResults = testResults;
+                }
+            \`;
+        }
+        
+        // Auto-load Threadfin on page load
+        window.onload = function() {
+            logMessage('🚀 Frontend test runner initialized');
+            logMessage('📋 Ready to test Threadfin loading screen fixes');
+        };
+    </script>
+</body>
+</html>
