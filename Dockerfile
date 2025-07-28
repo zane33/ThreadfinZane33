@@ -1,7 +1,5 @@
 # First stage. Building a binary
 # -----------------------------------------------------------------------------
-ARG USE_NVIDIA
-
 FROM golang:1.23-bullseye AS builder
 
 WORKDIR /app
@@ -46,14 +44,7 @@ RUN CGO_ENABLED=0 go build -mod=mod -ldflags="-s -w" -trimpath -o threadfin thre
 
 # Second stage. Creating a minimal image
 # -----------------------------------------------------------------------------
-ARG USE_NVIDIA
-FROM ubuntu:24.04 AS standard
-FROM nvidia/cuda:12.8.0-base-ubuntu24.04 AS nvidia
-FROM standard AS final
-FROM nvidia AS final-nvidia
-
-ARG USE_NVIDIA
-FROM final${USE_NVIDIA:+-nvidia}
+FROM ubuntu:24.04
 
 ARG BUILD_DATE
 ARG VCS_REF
@@ -88,18 +79,7 @@ ENV THREADFIN_BIN=/home/threadfin/bin \
 # Set working directory
 WORKDIR $THREADFIN_HOME
 
-# Arguments to add the jellyfin repository
-ARG TARGETARCH
-ARG OS_VERSION=ubuntu
-ARG OS_CODENAME=noble
-
-# Install dependencies in a single layer
-# Workaround for Ubuntu GPG key issues
-RUN apt-get update || true && \
-    apt-get install -y --no-install-recommends gnupg ca-certificates && \
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 3B4FE6ACC0B21F32 || true && \
-    apt-get update || true
-
+# Install basic dependencies without problematic repositories
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -107,27 +87,13 @@ RUN apt-get update && \
     ffmpeg \
     vlc \
     tzdata \
-    gnupg \
-    apt-transport-https \
     openssl \
     libssl3 && \
     mkdir -p $THREADFIN_BIN $THREADFIN_CONF $THREADFIN_TEMP $THREADFIN_HOME/cache && \
     chmod a+rwX $THREADFIN_CONF $THREADFIN_TEMP && \
     sed -i 's/geteuid/getppid/' /usr/bin/vlc && \
-    curl -fsSL https://repo.jellyfin.org/master/ubuntu/jellyfin_team.gpg.key \
-        | gpg --dearmor -o /etc/apt/trusted.gpg.d/ubuntu-jellyfin.gpg && \
-    (if [ "${TARGETARCH}" = "arm" ]; then \
-        echo "deb [arch=armhf] https://repo.jellyfin.org/master/${OS_VERSION} ${OS_CODENAME} main" > /etc/apt/sources.list.d/jellyfin.list; \
-    else \
-        echo "deb [arch=${TARGETARCH}] https://repo.jellyfin.org/master/${OS_VERSION} ${OS_CODENAME} main" > /etc/apt/sources.list.d/jellyfin.list; \
-    fi) && \
-    apt-get update && \
-    apt-get install --no-install-recommends --no-install-suggests --yes \
-        jellyfin-ffmpeg7 && \
-    apt-get remove gnupg apt-transport-https --yes  && \
-    apt-get clean autoclean --yes && \
-    apt-get autoremove --yes && \
-    rm -rf /var/cache/apt/archives* /var/lib/apt/lists/*
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy built binary from builder image
 COPY --from=builder /app/threadfin $THREADFIN_BIN/

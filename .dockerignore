@@ -1,2 +1,49 @@
-Dockerfile
-README.md
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Node modules (if any)
+node_modules/
+
+# Test data
+test-data/
+
+# Configuration files that should be mounted
+threadfin-conf/
+
+# Documentation
+*.md
+!README.md
+
+# Build scripts
+build-*.sh
+build-*.bat
+build-*.ps1

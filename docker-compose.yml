@@ -2,12 +2,8 @@ version: '3.8'
 
 services:
   threadfin:
-    # Option 1: Build from source (recommended for development)
-    build:
-      context: .
-      dockerfile: Dockerfile
-    # Option 2: Use pre-built image (uncomment if you have a built image)
-    # image: threadfinzane33:latest
+    # Use existing pre-built image instead of building from source
+    image: threadfinzane33:latest
     
     container_name: threadfin
     restart: unless-stopped

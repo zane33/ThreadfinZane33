@@ -1,0 +1,56 @@
+# Minimal Threadfin Dockerfile to avoid TLS issues
+FROM golang:1.23-bullseye AS builder
+
+WORKDIR /app
+
+# Copy go mod files first for better caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the source code
+COPY . .
+
+# Create a minimal stub webUI.go file
+RUN echo 'package src' > src/webUI.go && \
+    echo '' >> src/webUI.go && \
+    echo 'var webUI = make(map[string]interface{})' >> src/webUI.go && \
+    echo '' >> src/webUI.go && \
+    echo 'func loadHTMLMap() {}' >> src/webUI.go
+
+# Build the application
+RUN CGO_ENABLED=0 go build -mod=mod -ldflags="-s -w" -trimpath -o threadfin threadfin.go
+
+# Runtime stage
+FROM debian:bullseye-slim
+
+ENV THREADFIN_BIN=/home/threadfin/bin \
+    THREADFIN_CONF=/home/threadfin/conf \
+    THREADFIN_HOME=/home/threadfin \
+    THREADFIN_TEMP=/tmp/threadfin \
+    THREADFIN_CACHE=/home/threadfin/cache \
+    THREADFIN_PORT=34400 \
+    THREADFIN_BIND_IP_ADDRESS=0.0.0.0 \
+    THREADFIN_DEBUG=0
+
+WORKDIR $THREADFIN_HOME
+
+# Install minimal dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    ffmpeg \
+    vlc && \
+    mkdir -p $THREADFIN_BIN $THREADFIN_CONF $THREADFIN_TEMP $THREADFIN_HOME/cache && \
+    chmod a+rwX $THREADFIN_CONF $THREADFIN_TEMP && \
+    sed -i 's/geteuid/getppid/' /usr/bin/vlc && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy built binary
+COPY --from=builder /app/threadfin $THREADFIN_BIN/
+RUN chmod +rx $THREADFIN_BIN/threadfin
+
+VOLUME $THREADFIN_CONF
+EXPOSE $THREADFIN_PORT
+
+ENTRYPOINT ["sh", "-c", "${THREADFIN_BIN}/threadfin -port=${THREADFIN_PORT} -bind=${THREADFIN_BIND_IP_ADDRESS} -config=${THREADFIN_CONF} -debug=${THREADFIN_DEBUG}"] 
